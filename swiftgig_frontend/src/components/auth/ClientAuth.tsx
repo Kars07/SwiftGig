@@ -12,7 +12,6 @@ const ClientAuth = () => {
     streetAddress: '',
     city: '',
     stateProvince: '',
-    zipCode: '',
     phone: '',
     profilePhoto: null as File | null,
     accountNumber: '',
@@ -224,16 +223,6 @@ const ClientAuth = () => {
                         className="w-full px-4 py-3 bg-transparent border border-gray-600 rounded-lg text-white focus:outline-none focus:border-[#622578]"
                       />
                     </div>
-                    <div>
-                      <label className="block text-white font-medium mb-2">ZIP/Postal code</label>
-                      <input
-                        type="text"
-                        placeholder="Enter ZIP/Postal code"
-                        value={formData.zipCode}
-                        onChange={(e) => handleInputChange('zipCode', e.target.value)}
-                        className="w-full px-4 py-3 bg-transparent border border-gray-600 rounded-lg text-white focus:outline-none focus:border-[#622578]"
-                      />
-                    </div>
                   </div>
 
                   {/* Phone */}
@@ -254,60 +243,6 @@ const ClientAuth = () => {
                         onChange={(e) => handleInputChange('phone', e.target.value)}
                         className="flex-1 px-4 py-3 bg-transparent border border-gray-600 rounded-lg text-white focus:outline-none focus:border-[#622578]"
                       />
-                    </div>
-                  </div>
-
-                  {/* Banking Information Section */}
-                  <div className="pt-6 border-t border-gray-700">
-                    <h3 className="text-xl font-semibold text-white mb-4">Banking Information</h3>
-                    
-                    {/* Account Number */}
-                    <div className="mb-4">
-                      <label className="block text-white font-medium mb-2">
-                        Account Number <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Enter account number (10 digits)"
-                        value={formData.accountNumber}
-                        onChange={(e) => handleAccountNumberChange(e.target.value)}
-                        maxLength={10}
-                        className="w-full md:w-2/3 px-4 py-3 bg-transparent border border-gray-600 rounded-lg text-white focus:outline-none focus:border-[#622578]"
-                      />
-                      <p className="text-gray-500 text-sm mt-1">
-                        {formData.accountNumber.length}/10 digits
-                      </p>
-                    </div>
-
-                    {/* Account Name */}
-                    <div className="mb-4">
-                      <label className="block text-white font-medium mb-2">
-                        Account Name <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Enter account name"
-                        value={formData.accountName}
-                        onChange={(e) => handleInputChange('accountName', e.target.value)}
-                        className="w-full md:w-2/3 px-4 py-3 bg-transparent border border-gray-600 rounded-lg text-white focus:outline-none focus:border-[#622578]"
-                      />
-                    </div>
-
-                    {/* Bank Name */}
-                    <div>
-                      <label className="block text-white font-medium mb-2">
-                        Bank Name <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        value={formData.bankName}
-                        onChange={(e) => handleInputChange('bankName', e.target.value)}
-                        className="w-full md:w-2/3 px-4 py-3 bg-[#1a1a1a] border border-gray-600 rounded-lg text-white focus:outline-none focus:border-[#622578]"
-                      >
-                        <option value="">Select your bank</option>
-                        {nigerianBanks.map((bank) => (
-                          <option key={bank} value={bank}>{bank}</option>
-                        ))}
-                      </select>
                     </div>
                   </div>
                 </div>
