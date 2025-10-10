@@ -27,16 +27,90 @@ SwiftGig is an open-source gig management application written in Swift. It is de
 
 ![Gig Details](client.png)
 
+--- 
+
+## 🚀 Key Features
+
+### 🧑‍💻 Talent Dashboard
+- Manage gigs, earnings, and job history in one place.  
+- Submit proposals and communicate directly with clients.  
+- View real-time analytics on job performance and ratings.  
+- Withdraw funds instantly using blockchain-enabled payouts.  
+- Access a credit score that reflects reliability and performance.
+
+### 🧑‍💼 Client Dashboard
+- Post new gigs and track submissions easily.  
+- Hire top-rated freelancers with transparent review systems.  
+- Manage ongoing projects and milestone payments.  
+- View spending insights and payment history.  
+- Verify completed work using timestamped proof stored on-chain.
 
 ---
 
-## Getting Started
+## 💸 Instant Payout System
+SwiftGig leverages blockchain technology to provide **instant, secure, and transparent payments**.  
+No more waiting days for withdrawals — once a job is approved, freelancers get paid **instantly** through smart contracts.
 
-### Prerequisites
+---
 
-- [Swift 5.7+](https://swift.org/download/)
-- [Xcode 14+](https://developer.apple.com/xcode/)
-- macOS 12.0+ or iOS 15.0+
+## 🔗 Blockchain-Powered Infrastructure
+- Built on a decentralized payment architecture for security and transparency.  
+- Smart contracts handle escrow and automatic payment releases.  
+- On-chain proof ensures trust and eliminates disputes.
+
+---
+
+## 🛠️ Tech Stack
+
+**Frontend:** React + Vite + TypeScript + Tailwind CSS  
+**Backend:** Node.js + Express + MongoDB  
+**Blockchain Layer:** Smart contracts for escrow & instant payout  
+**Authentication:** JWT + OAuth + Email verification  
+
+---
+
+## 🌍 Vision
+
+SwiftGig aims to empower the next generation of freelancers across Africa and beyond by providing a **trustless, borderless, and inclusive gig economy**.  
+It bridges the gap between talent and opportunity through **automation, transparency, and instant reward systems**.
+
+---
+
+## 🧩 Core Modules
+| Module | Description |
+|--------|--------------|
+| 🧠 Auth System | Secure login, register, and email verification |
+| 💼 Dashboard | Separate views for talents and clients |
+| 💰 Wallet | Manage balance, view transactions, and withdraw instantly |
+| 🪙 Smart Contracts | Handles escrow and auto-payouts |
+| ⭐ Ratings & Reviews | Build credibility and trust between users |
+| 📈 Analytics | Get insights into work history and earnings |
+
+---
+
+## 🧠 Future Roadmap
+- 🌐 Multi-chain support (Arbitrum, Cardano, etc.)  
+- 📱 Mobile app for Android and iOS  
+- 🧾 AI-powered gig recommendations  
+- 🛡️ Decentralized reputation scoring  
+
+---
+
+## 👥 Team
+SwiftGig is developed by **a passionate team of developers and innovators** dedicated to building the future of work — decentralized, instant, and borderless and it is comprised
+of a team across most stacks, Frontend, Backend, Smart-Contract Developer, AI/ML, Product Design, Data science and CyberSecurity.
+
+---
+
+## 📜 License
+This project is licensed under the **MIT License** — feel free to use, modify, and contribute.
+
+---
+
+### 💬 Connect with Us
+If you'd like to collaborate or contribute, feel free to open an issue or reach out via GitHub discussions.
+
+> **SwiftGig — Work Faster. Get Paid Instantly.**
 
 ### Installation
 
