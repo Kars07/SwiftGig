@@ -120,11 +120,41 @@ If you'd like to collaborate or contribute, feel free to open an issue or reach 
     cd SwiftGig
     ```
 
-2. **Open the project in Xcode:**
-    - Double-click `SwiftGig.xcodeproj` or `SwiftGig.xcworkspace`.
+2. **Open the project in VS code or any preferred Code Editor:**
+    ```bash
+    cd swiftgig_frontend
+    npm install
+    ```
+    
+3. **After installing dependencies for frontend do the same for Backend:**
+   ```bash
+    cd swiftgig_backend
+    npm install
+    ```
+4. **Run the Development Server :**
+    ```bash
+    npm run dev --Frontend
+    node server.js --Backend
+    ```
 
-3. **Build & Run:**
-    - Select your target device (Mac, iPhone, or Simulator) and hit **Run** (⌘R).
+4. **Development Server should run:**
+    ```bash
+    http://localhost:5173/ --Frontend
+    http://localhost:1010/ --Backend
+    ```
+5. **Check for routes in the App.tsx file in swiftgig_frontend/src/App.tsx**
+   ```bash
+    Available routes 
+    -/
+    -/signup
+    -/register/client
+    -/register/talent
+    -/client-auth
+    -/talent-auth
+    -/verify
+    -/talent-dashboard
+    -/client-dashboard
+    ```
 
 ---
 
