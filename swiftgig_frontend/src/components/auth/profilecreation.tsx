@@ -384,9 +384,9 @@ export default function CreateProfile() {
                 onChange={handleInputChange}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#622578] focus:ring-1 focus:ring-[#622578]"
               >
-                <option value="remote">🏠 Remote</option>
-                <option value="physical">🏢 Physical</option>
-                <option value="both">🌍 Both</option>
+                <option value="remote">Remote</option>
+                <option value="physical">Physical</option>
+                <option value="both">Both</option>
               </select>
             </div>
 
