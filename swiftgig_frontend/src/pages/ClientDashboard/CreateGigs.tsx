@@ -1,8 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, X, Users, Clock, Calendar, CheckCircle, XCircle, Star } from 'lucide-react';
+import { useCurrentAccount, useSignAndExecuteTransaction, useSuiClient } from '@mysten/dapp-kit';
+import { Transaction } from '@mysten/sui/transactions';
+
+const PACKAGE_ID = '0x58bdb3c9bd2d41c26b85131798d421fff9a9de89ccd82b007ccac144c3114313'; // Replace with your deployed package ID
+const REGISTRY_ID = '0xa67a472036dfeb14dd622ff9af24fdfec492a09879ea5637091d927159541474';
 
 interface Gig {
-  id: number;
+  id: string;
   name: string;
   description: string;
   deadline: string;
@@ -11,10 +16,12 @@ interface Gig {
   amount: number;
   createdAt: string;
   applicants: number;
+  waitlist: string[];
+  acceptedTalents: string[];
 }
 
 interface Talent {
-  id: number;
+  address: string;
   name: string;
   creditScore: number;
   experience: string;
@@ -22,11 +29,17 @@ interface Talent {
 }
 
 export default function CreateGigs() {
+  const account = useCurrentAccount();
+  const { mutate: signAndExecute } = useSignAndExecuteTransaction();
+  const suiClient = useSuiClient();
+  
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isWaitlistModalOpen, setIsWaitlistModalOpen] = useState(false);
   const [selectedGig, setSelectedGig] = useState<Gig | null>(null);
   const [successMessage, setSuccessMessage] = useState('');
   const [gigs, setGigs] = useState<Gig[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [fetchingGigs, setFetchingGigs] = useState(false);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -37,12 +50,70 @@ export default function CreateGigs() {
     amount: ''
   });
 
-  const mockTalents: Talent[] = [
-    { id: 1, name: 'John Doe', creditScore: 850, experience: '5 years in web development', avatar: 'JD' },
-    { id: 2, name: 'Jane Smith', creditScore: 780, experience: '3 years in UI/UX design', avatar: 'JS' },
-    { id: 3, name: 'Mike Johnson', creditScore: 920, experience: '7 years in full-stack development', avatar: 'MJ' },
-    { id: 4, name: 'Sarah Williams', creditScore: 810, experience: '4 years in mobile development', avatar: 'SW' }
-  ];
+  // Fetch user's gigs on mount
+  useEffect(() => {
+    if (account?.address) {
+      fetchUserGigs();
+    }
+  }, [account?.address]);
+
+  const fetchUserGigs = async () => {
+    if (!account?.address) return;
+    
+    setFetchingGigs(true);
+    try {
+      // Query for GigCreated events where the creator is the current user
+      const gigCreatedEvents = await suiClient.queryEvents({
+        query: {
+          MoveEventType: `${PACKAGE_ID}::swiftgig::GigCreated`,
+        },
+        limit: 100,
+      });
+
+      const userGigs: Gig[] = [];
+
+      for (const event of gigCreatedEvents.data) {
+        const eventData = event.parsedJson as any;
+        
+        // Only include gigs created by the current user
+        if (eventData.creator === account.address) {
+          try {
+            const gigObject = await suiClient.getObject({
+              id: eventData.gig_id,
+              options: { showContent: true },
+            });
+
+            if (gigObject.data?.content && 'fields' in gigObject.data.content) {
+              const fields = gigObject.data.content.fields as any;
+              const metadata = fields.metadata;
+              
+              userGigs.push({
+                id: eventData.gig_id,
+                name: metadata.name,
+                description: metadata.description,
+                deadline: new Date(parseInt(metadata.deadline)).toLocaleDateString(),
+                talentsNeeded: parseInt(metadata.talents_needed),
+                timeframe: parseInt(metadata.gig_active_timeframe),
+                amount: eventData.reward_amount / 1000000000, // Convert from MIST to SUI
+                createdAt: new Date(event.timestampMs ?? 0).toLocaleDateString(),
+                applicants: fields.waitlist?.length || 0,
+                waitlist: fields.waitlist || [],
+                acceptedTalents: fields.accepted_talents || []
+              });
+            }
+          } catch (error) {
+            console.warn(`Could not fetch gig ${eventData.gig_id}:`, error);
+          }
+        }
+      }
+
+      setGigs(userGigs);
+    } catch (error) {
+      console.error('Error fetching user gigs:', error);
+    } finally {
+      setFetchingGigs(false);
+    }
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({
@@ -52,47 +123,125 @@ export default function CreateGigs() {
   };
 
   const handleCreateGig = () => {
+    if (!account) {
+      alert('Please connect your wallet');
+      return;
+    }
+
     if (!formData.name || !formData.description || !formData.deadline || !formData.talentsNeeded || !formData.timeframe || !formData.amount) {
+      alert('Please fill in all fields');
       return;
     }
     
-    const newGig: Gig = {
-      id: Date.now(),
-      name: formData.name,
-      description: formData.description,
-      deadline: formData.deadline,
-      talentsNeeded: parseInt(formData.talentsNeeded),
-      timeframe: parseInt(formData.timeframe),
-      amount: parseInt(formData.amount),
-      createdAt: new Date().toLocaleDateString(),
-      applicants: Math.floor(Math.random() * 10) + 1
-    };
-
-    setGigs([newGig, ...gigs]);
-    setIsCreateModalOpen(false);
-    setSuccessMessage('Gig created successfully! 🎉');
+    setLoading(true);
+    const tx = new Transaction();
     
-    setFormData({
-      name: '',
-      description: '',
-      deadline: '',
-      talentsNeeded: '',
-      timeframe: '',
-      amount: ''
+    // Convert deadline to timestamp
+    const deadlineDate = new Date(formData.deadline);
+    const deadlineMs = deadlineDate.getTime();
+    
+    // Convert timeframe (days) to milliseconds
+    const timeframeMs = parseInt(formData.timeframe) * 24 * 60 * 60 * 1000;
+    
+    // Convert amount to MIST (1 SUI = 1,000,000,000 MIST)
+    const amountInMist = parseFloat(formData.amount) * 1000000000;
+    
+    // Split the payment coin
+    const [paymentCoin] = tx.splitCoins(tx.gas, [tx.pure.u64(amountInMist)]);
+    
+    tx.moveCall({
+      target: `${PACKAGE_ID}::swiftgig::create_gig`,
+      arguments: [
+        tx.object(REGISTRY_ID),
+        tx.pure.string(formData.name),
+        tx.pure.string(formData.description),
+        tx.pure.u64(deadlineMs),
+        tx.pure.u64(parseInt(formData.talentsNeeded)),
+        tx.pure.u64(timeframeMs),
+        paymentCoin,
+        tx.object('0x6'), // Clock object
+      ],
     });
 
-    setTimeout(() => setSuccessMessage(''), 3000);
+    signAndExecute(
+      {
+        transaction: tx,
+      },
+      {
+        onError: (err) => {
+          console.error('Error creating gig:', err);
+          setLoading(false);
+          alert('Failed to create gig. Please try again.');
+        },
+        onSuccess: (result) => {
+          console.log('Gig created successfully:', result);
+          setLoading(false);
+          setIsCreateModalOpen(false);
+          setSuccessMessage('Gig created successfully! 🎉');
+          
+          // Reset form
+          setFormData({
+            name: '',
+            description: '',
+            deadline: '',
+            talentsNeeded: '',
+            timeframe: '',
+            amount: ''
+          });
+
+          // Refresh gigs list
+          setTimeout(() => {
+            fetchUserGigs();
+          }, 2000);
+
+          setTimeout(() => setSuccessMessage(''), 3000);
+        },
+      }
+    );
   };
 
-  const handleApprove = (talentName: string) => {
-    setSuccessMessage(`You have selected ${talentName} for this gig! ✅`);
-    setIsWaitlistModalOpen(false);
-    setTimeout(() => setSuccessMessage(''), 3000);
-  };
+  const handleSelectTalents = async (gigId: string, selectedTalentAddresses: string[]) => {
+    if (!account) return;
+    
+    setLoading(true);
+    const tx = new Transaction();
+    
+    // Create a vector of selected talent addresses
+    const talentAddresses = selectedTalentAddresses.map(addr => tx.pure.address(addr));
+    
+    tx.moveCall({
+      target: `${PACKAGE_ID}::swiftgig::select_talents`,
+      arguments: [
+        tx.object(gigId),
+        tx.makeMoveVec({ elements: talentAddresses }),
+      ],
+    });
 
-  const handleReject = (talentName: string) => {
-    setSuccessMessage(`${talentName} has been rejected.`);
-    setTimeout(() => setSuccessMessage(''), 3000);
+    signAndExecute(
+      {
+        transaction: tx,
+      },
+      {
+        onError: (err) => {
+          console.error('Error selecting talents:', err);
+          setLoading(false);
+          alert('Failed to select talents');
+        },
+        onSuccess: (result) => {
+          console.log('Talents selected successfully:', result);
+          setLoading(false);
+          setSuccessMessage('Talents selected successfully! ✅');
+          setIsWaitlistModalOpen(false);
+          
+          // Refresh gigs
+          setTimeout(() => {
+            fetchUserGigs();
+          }, 2000);
+
+          setTimeout(() => setSuccessMessage(''), 3000);
+        },
+      }
+    );
   };
 
   const getCreditScoreColor = (score: number) => {
@@ -101,6 +250,20 @@ export default function CreateGigs() {
     if (score >= 650) return 'text-yellow-400';
     return 'text-red-400';
   };
+
+  if (!account) {
+    return (
+      <div className="min-h-screen bg-[#1a1a1a] flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-20 h-20 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Plus className="w-10 h-10 text-gray-600" />
+          </div>
+          <h3 className="text-xl font-semibold text-white mb-2">Wallet Not Connected</h3>
+          <p className="text-gray-400">Please connect your wallet to create and manage gigs</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#1a1a1a] p-8">
@@ -126,7 +289,14 @@ export default function CreateGigs() {
           </div>
         )}
 
-        {gigs.length === 0 ? (
+        {fetchingGigs ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <div className="w-12 h-12 border-4 border-[#622578] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-gray-400">Loading your gigs...</p>
+            </div>
+          </div>
+        ) : gigs.length === 0 ? (
           <div className="bg-[#0f0f0f] border border-gray-800 rounded-xl p-12 text-center">
             <div className="w-20 h-20 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
               <Plus className="w-10 h-10 text-gray-600" />
@@ -150,7 +320,7 @@ export default function CreateGigs() {
                 
                 <div className="mb-4 bg-[#622578]/20 border border-[#622578] rounded-lg p-3">
                   <p className="text-xs text-gray-400 mb-1">Payment Amount</p>
-                  <p className="text-2xl font-bold text-[#622578]">₦{gig.amount.toLocaleString()}</p>
+                  <p className="text-2xl font-bold text-[#622578]">{gig.amount.toFixed(2)} SUI</p>
                 </div>
                 
                 <div className="space-y-2 mb-4">
@@ -164,7 +334,7 @@ export default function CreateGigs() {
                   </div>
                   <div className="flex items-center space-x-2 text-sm text-gray-400">
                     <Clock className="w-4 h-4" />
-                    <span>Available for: {gig.timeframe} days</span>
+                    <span>Accepted: {gig.acceptedTalents.length}/{gig.talentsNeeded}</span>
                   </div>
                 </div>
 
@@ -186,16 +356,18 @@ export default function CreateGigs() {
         )}
       </div>
 
+      {/* Create Gig Modal */}
       {isCreateModalOpen && (
         <>
-          <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setIsCreateModalOpen(false)}></div>
+          <div className="fixed inset-0 bg-black/50 z-40" onClick={() => !loading && setIsCreateModalOpen(false)}></div>
           <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
             <div className="bg-[#0f0f0f] border border-gray-800 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between p-6 border-b border-gray-800">
                 <h2 className="text-2xl font-bold text-white">Create New Gig</h2>
                 <button
-                  onClick={() => setIsCreateModalOpen(false)}
+                  onClick={() => !loading && setIsCreateModalOpen(false)}
                   className="text-gray-400 hover:text-white transition-colors"
+                  disabled={loading}
                 >
                   <X className="w-6 h-6" />
                 </button>
@@ -210,9 +382,9 @@ export default function CreateGigs() {
                     <div>
                       <h4 className="text-blue-400 font-semibold text-sm mb-1">Payment & Trust Policy</h4>
                       <p className="text-blue-300 text-xs leading-relaxed">
-                        When you activate this gig, the payment amount will be securely transferred from your wallet to our Treasury account. 
+                        When you create this gig, the payment amount will be securely transferred from your wallet to the Gig Treasury. 
                         This ensures trust and security between you and the talents. In case of any dissatisfaction with the work delivered, 
-                        you will be refunded immediately.
+                        you can request a refund through the review process.
                       </p>
                     </div>
                   </div>
@@ -227,6 +399,7 @@ export default function CreateGigs() {
                     onChange={handleInputChange}
                     placeholder="e.g., Mobile App Development"
                     className="w-full bg-[#1a1a1a] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#622578] transition-colors"
+                    disabled={loading}
                   />
                 </div>
 
@@ -239,24 +412,24 @@ export default function CreateGigs() {
                     rows={4}
                     placeholder="Describe the gig requirements and expectations..."
                     className="w-full bg-[#1a1a1a] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#622578] transition-colors resize-none"
+                    disabled={loading}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Payment Amount (₦) *</label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg">₦</span>
-                    <input
-                      type="number"
-                      name="amount"
-                      value={formData.amount}
-                      onChange={handleInputChange}
-                      min="1"
-                      placeholder="50000"
-                      className="w-full bg-[#1a1a1a] border border-gray-700 rounded-lg pl-10 pr-4 py-3 text-white focus:outline-none focus:border-[#622578] transition-colors"
-                    />
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">Total payment for this gig</p>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Payment Amount (SUI) *</label>
+                  <input
+                    type="number"
+                    name="amount"
+                    value={formData.amount}
+                    onChange={handleInputChange}
+                    min="0.01"
+                    step="0.01"
+                    placeholder="e.g., 10.5"
+                    className="w-full bg-[#1a1a1a] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#622578] transition-colors"
+                    disabled={loading}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Total payment for this gig in SUI tokens</p>
                 </div>
 
                 <div>
@@ -266,7 +439,9 @@ export default function CreateGigs() {
                     name="deadline"
                     value={formData.deadline}
                     onChange={handleInputChange}
+                    min={new Date().toISOString().split('T')[0]}
                     className="w-full bg-[#1a1a1a] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#622578] transition-colors"
+                    disabled={loading}
                   />
                 </div>
 
@@ -281,20 +456,23 @@ export default function CreateGigs() {
                       min="1"
                       placeholder="e.g., 3"
                       className="w-full bg-[#1a1a1a] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#622578] transition-colors"
+                      disabled={loading}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Gig Timeframe (days) *</label>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Application Timeframe (days) *</label>
                     <input
                       type="number"
                       name="timeframe"
                       value={formData.timeframe}
                       onChange={handleInputChange}
                       min="1"
-                      placeholder="e.g., 12"
+                      placeholder="e.g., 7"
                       className="w-full bg-[#1a1a1a] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#622578] transition-colors"
+                      disabled={loading}
                     />
+                    <p className="text-xs text-gray-500 mt-1">Days talents can apply</p>
                   </div>
                 </div>
 
@@ -302,14 +480,16 @@ export default function CreateGigs() {
                   <button
                     onClick={() => setIsCreateModalOpen(false)}
                     className="px-6 py-3 text-gray-400 hover:text-white transition-colors"
+                    disabled={loading}
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleCreateGig}
-                    className="bg-[#622578] hover:bg-[#7a2e94] text-white font-semibold px-6 py-3 rounded-lg transition-colors"
+                    disabled={loading}
+                    className="bg-[#622578] hover:bg-[#7a2e94] text-white font-semibold px-6 py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Create Gig
+                    {loading ? 'Creating...' : 'Create Gig'}
                   </button>
                 </div>
               </div>
@@ -318,62 +498,84 @@ export default function CreateGigs() {
         </>
       )}
 
+      {/* Waitlist Modal */}
       {isWaitlistModalOpen && selectedGig && (
         <>
-          <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setIsWaitlistModalOpen(false)}></div>
+          <div className="fixed inset-0 bg-black/50 z-40" onClick={() => !loading && setIsWaitlistModalOpen(false)}></div>
           <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
             <div className="bg-[#0f0f0f] border border-gray-800 rounded-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between p-6 border-b border-gray-800">
                 <div>
                   <h2 className="text-2xl font-bold text-white">{selectedGig.name}</h2>
-                  <p className="text-gray-400 text-sm mt-1">Talent Waitlist</p>
+                  <p className="text-gray-400 text-sm mt-1">Talent Waitlist ({selectedGig.waitlist.length} applicants)</p>
                 </div>
                 <button
-                  onClick={() => setIsWaitlistModalOpen(false)}
+                  onClick={() => !loading && setIsWaitlistModalOpen(false)}
                   className="text-gray-400 hover:text-white transition-colors"
+                  disabled={loading}
                 >
                   <X className="w-6 h-6" />
                 </button>
               </div>
 
               <div className="p-6 space-y-4">
-                {mockTalents.map((talent) => (
-                  <div key={talent.id} className="bg-[#1a1a1a] border border-gray-800 rounded-lg p-4 hover:border-[#622578] transition-colors">
-                    <div className="flex items-start justify-between flex-wrap gap-4">
-                      <div className="flex items-start space-x-4">
-                        <div className="w-12 h-12 rounded-full bg-[#622578] flex items-center justify-center text-white font-semibold flex-shrink-0">
-                          {talent.avatar}
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="text-lg font-semibold text-white mb-1">{talent.name}</h3>
-                          <p className="text-sm text-gray-400 mb-2">{talent.experience}</p>
-                          <div className="flex items-center space-x-2">
-                            <Star className="w-4 h-4 text-yellow-500" />
-                            <span className={`text-sm font-semibold ${getCreditScoreColor(talent.creditScore)}`}>
-                              Credit Score: {talent.creditScore}
-                            </span>
+                {selectedGig.waitlist.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Users className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                    <p className="text-gray-400">No applications yet</p>
+                  </div>
+                ) : (
+                  selectedGig.waitlist.map((talentAddress, index) => {
+                    const isSelected = selectedGig.acceptedTalents.includes(talentAddress);
+                    
+                    return (
+                      <div key={index} className={`bg-[#1a1a1a] border rounded-lg p-4 transition-colors ${
+                        isSelected ? 'border-green-500' : 'border-gray-800 hover:border-[#622578]'
+                      }`}>
+                        <div className="flex items-start justify-between flex-wrap gap-4">
+                          <div className="flex items-start space-x-4">
+                            <div className="w-12 h-12 rounded-full bg-[#622578] flex items-center justify-center text-white font-semibold flex-shrink-0">
+                              {talentAddress.slice(2, 4).toUpperCase()}
+                            </div>
+                            <div className="flex-1">
+                              <h3 className="text-lg font-semibold text-white mb-1">
+                                {talentAddress.slice(0, 6)}...{talentAddress.slice(-4)}
+                              </h3>
+                              <p className="text-sm text-gray-400 mb-2">Wallet Address</p>
+                              {isSelected && (
+                                <span className="inline-flex items-center space-x-1 bg-green-500/20 text-green-400 text-xs font-semibold px-2 py-1 rounded">
+                                  <CheckCircle className="w-3 h-3" />
+                                  <span>Selected</span>
+                                </span>
+                              )}
+                            </div>
                           </div>
+                          {!isSelected && selectedGig.acceptedTalents.length < selectedGig.talentsNeeded && (
+                            <button
+                              onClick={() => handleSelectTalents(selectedGig.id, [...selectedGig.acceptedTalents, talentAddress])}
+                              disabled={loading}
+                              className="flex items-center space-x-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <CheckCircle className="w-4 h-4" />
+                              <span>{loading ? 'Selecting...' : 'Select'}</span>
+                            </button>
+                          )}
                         </div>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => handleApprove(talent.name)}
-                          className="flex items-center space-x-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors"
-                        >
-                          <CheckCircle className="w-4 h-4" />
-                          <span>Approve</span>
-                        </button>
-                        <button
-                          onClick={() => handleReject(talent.name)}
-                          className="flex items-center space-x-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors"
-                        >
-                          <XCircle className="w-4 h-4" />
-                          <span>Reject</span>
-                        </button>
-                      </div>
+                    );
+                  })
+                )}
+                
+                {selectedGig.acceptedTalents.length >= selectedGig.talentsNeeded && (
+                  <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4 mt-4">
+                    <div className="flex items-center space-x-2">
+                      <CheckCircle className="w-5 h-5 text-green-500" />
+                      <p className="text-green-400 font-medium">
+                        All talent slots filled ({selectedGig.acceptedTalents.length}/{selectedGig.talentsNeeded})
+                      </p>
                     </div>
                   </div>
-                ))}
+                )}
               </div>
             </div>
           </div>
