@@ -3,6 +3,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   Home,
   Briefcase,
+  Book,
   BarChart3,
   Settings,
   User,
@@ -11,6 +12,7 @@ import {
   PlusCircle,
   FileText,
   LogOut,
+  BookCheckIcon,
 } from 'lucide-react';
 
 export default function ClientDashboard() {
@@ -33,6 +35,7 @@ export default function ClientDashboard() {
       ],
     },
     { id: 'Disputes', label: 'Disputes', icon: BarChart3, path: '/client-dashboard/disputes' },
+    { id: 'Review', label: 'Reviews', icon: Book, path: '/client-dashboard/review-submissions' },
     { id: 'settings', label: 'Settings', icon: Settings, path: '/client-dashboard/settings' },
     { id: 'profile', label: 'Profile', icon: User, path: '/client-dashboard/profile' },
   ];

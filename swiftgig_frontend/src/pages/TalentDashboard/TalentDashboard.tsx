@@ -9,6 +9,7 @@ import {
   LogOut,
   Menu,
   X,
+  Book,
 } from "lucide-react";
 
 export default function TalentDashboard() {
@@ -83,6 +84,12 @@ export default function TalentDashboard() {
       label: "Gigs",
       icon: Briefcase,
       path: "/talent-dashboard/gigs",
+    },
+    {
+      id: "Submissions",
+      label: "Submissions",
+      icon: Book,
+      path: "/talent-dashboard/submissions",
     },
     {
       id: "voting-poll",

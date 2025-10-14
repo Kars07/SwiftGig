@@ -19,6 +19,8 @@ import DashboardProfile from './pages/TalentDashboard/DashboardProfile'
 import DashboardSettings from './pages/TalentDashboard/DashboardSettings'
 import ClientProfile from './pages/ClientDashboard/ClientProfile';
 import ClientSettings from './pages/ClientDashboard/ClientSettings';
+import Submission from './pages/TalentDashboard/Submission';
+import ReviewSubmission from './pages/ClientDashboard/ReviewSubmission';
 
 
 function LandingPage() {
@@ -75,6 +77,7 @@ export default function App() {
           <Route path="disputes" element={<Disputes />} />
           <Route path="settings" element={<ClientSettings />} />
           <Route path="profile" element={<ClientProfile />} />
+          <Route path="review-submissions" element={<ReviewSubmission />} />
         </Route>
 
         {/* Talent Dashboard Routes */}
@@ -85,6 +88,7 @@ export default function App() {
           <Route path="voting-poll" element={<VotingPoll />} />
           <Route path="settings" element={<DashboardSettings />} />
           <Route path="profile" element={<DashboardProfile />} />
+          <Route path="submissions" element={<Submission />} />
         </Route>
       </Routes>
     </Router>
