@@ -268,18 +268,53 @@ export default function CreateGigs() {
   return (
     <div className="min-h-screen bg-[#1a1a1a] p-8">
       <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-white mb-2">Create Gigs</h1>
-            <p className="text-gray-400">Post new gigs and manage talent applications</p>
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h1 className="text-3xl font-bold text-white mb-2">Create Gigs</h1>
+              <p className="text-gray-400">Post new gigs and manage talent applications</p>
+            </div>
+            <div className="relative w-96">
+              <input
+                type="text"
+                placeholder="Search gigs..."
+                className="w-full bg-[#0f0f0f] border border-gray-800 rounded-lg pl-4 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-[#622578] transition-colors"
+              />
+            </div>
           </div>
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="flex items-center space-x-2 bg-[#622578] hover:bg-[#7a2e94] text-white font-semibold px-6 py-3 rounded-lg transition-colors"
-          >
-            <Plus className="w-5 h-5" />
-            <span>Create New Gig</span>
-          </button>
+
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-[#0f0f0f] border border-gray-800 rounded-xl p-6 flex items-center justify-between">
+              <div>
+                <p className="text-gray-400 text-sm mb-1">Gigs Created</p>
+                <p className="text-4xl font-bold text-white">{gigs.length}</p>
+              </div>
+              <div className="w-12 h-12 bg-[#622578]/20 rounded-lg flex items-center justify-center">
+                <Plus className="w-6 h-6 text-[#622578]" />
+              </div>
+            </div>
+
+            <div className="bg-[#0f0f0f] border border-gray-800 rounded-xl p-6 flex items-center justify-between">
+              <div>
+                <p className="text-gray-400 text-sm mb-1">Active Gigs</p>
+                <p className="text-4xl font-bold text-white">{gigs.length}</p>
+              </div>
+              <div className="w-12 h-12 bg-[#622578]/20 rounded-lg flex items-center justify-center">
+                <Star className="w-6 h-6 text-[#622578]" />
+              </div>
+            </div>
+
+            <div className="bg-[#0f0f0f] border border-gray-800 rounded-xl p-6 flex items-center justify-between">
+              <div>
+                <p className="text-gray-400 text-sm mb-1">Credit Score</p>
+                <p className="text-4xl font-bold text-white">300</p>
+              </div>
+              <div className="w-12 h-12 bg-[#622578]/20 rounded-lg flex items-center justify-center">
+                <Users className="w-6 h-6 text-[#622578]" />
+              </div>
+            </div>
+          </div>
         </div>
 
         {successMessage && (
@@ -312,7 +347,17 @@ export default function CreateGigs() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="mt-10">
+            {/* Section Header for Gigs Created */}
+            <div className="flex items-center mb-6">
+              <div className="bg-[#622578]/20 border border-[#622578]/40 text-[#622578] font-semibold px-5 py-2 rounded-full text-sm uppercase tracking-wide">
+                Gigs Created
+              </div>
+              <div className="flex-1 border-t border-gray-800 ml-4"></div>
+            </div>
+
+            {/* Gigs List */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {gigs.map((gig) => (
               <div key={gig.id} className="bg-[#0f0f0f] border border-gray-800 rounded-xl p-6 hover:border-[#622578] transition-colors">
                 <h3 className="text-xl font-semibold text-white mb-2">{gig.name}</h3>
@@ -352,6 +397,7 @@ export default function CreateGigs() {
                 </div>
               </div>
             ))}
+          </div>
           </div>
         )}
       </div>

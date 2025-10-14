@@ -1,6 +1,17 @@
 import React, { useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Home, Briefcase, BarChart3, Settings, User, ChevronDown, ChevronRight, PlusCircle, FileText, LogOut } from 'lucide-react';
+import {
+  Home,
+  Briefcase,
+  BarChart3,
+  Settings,
+  User,
+  ChevronDown,
+  ChevronRight,
+  PlusCircle,
+  FileText,
+  LogOut,
+} from 'lucide-react';
 
 export default function ClientDashboard() {
   const [isGigsOpen, setIsGigsOpen] = useState(false);
@@ -10,18 +21,18 @@ export default function ClientDashboard() {
 
   const menuItems = [
     { id: 'home', label: 'Home', icon: Home, path: '/client-dashboard' },
-    { 
-      id: 'gigs', 
-      label: 'Gigs', 
-      icon: Briefcase, 
+    {
+      id: 'gigs',
+      label: 'Gigs',
+      icon: Briefcase,
       hasDropdown: true,
       path: '',
       subItems: [
         { id: 'create-gigs', label: 'Create gigs', icon: PlusCircle, path: '/client-dashboard/create-gigs' },
-        { id: 'your-gigs', label: 'Your gigs', icon: FileText, path: '/client-dashboard/your-gigs' }
-      ]
+        { id: 'your-gigs', label: 'Your gigs', icon: FileText, path: '/client-dashboard/your-gigs' },
+      ],
     },
-    { id: 'Disputes', label: 'disputes', icon: BarChart3, path: '/client-dashboard/disputes' },
+    { id: 'Disputes', label: 'Disputes', icon: BarChart3, path: '/client-dashboard/disputes' },
     { id: 'settings', label: 'Settings', icon: Settings, path: '/client-dashboard/settings' },
     { id: 'profile', label: 'Profile', icon: User, path: '/client-dashboard/profile' },
   ];
@@ -42,7 +53,7 @@ export default function ClientDashboard() {
       <div className="w-64 bg-[#0f0f0f] border-r border-gray-800 flex flex-col relative z-10">
         {/* User Profile Section */}
         <div className="p-4 border-b border-gray-800">
-          <button 
+          <button
             onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
             className="w-full flex items-center space-x-3 hover:bg-gray-800 p-2 rounded-lg transition-colors"
           >
@@ -53,18 +64,22 @@ export default function ClientDashboard() {
               <h3 className="text-white font-medium text-sm">User</h3>
               <p className="text-gray-400 text-xs">FREE</p>
             </div>
-            <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown
+              className={`w-4 h-4 text-gray-400 transition-transform ${
+                isUserMenuOpen ? 'rotate-180' : ''
+              }`}
+            />
           </button>
         </div>
 
-        {/* Navigation Menu */}
-        <nav className="flex-1 py-4 overflow-y-auto">
-          <div className="space-y-1 px-2">
+        {/* Navigation Menu (no overflow to avoid scroll bar on dropdown) */}
+        <nav className="flex-1 py-4">
+          <div className="space-y-3 px-3">
             {menuItems.map((item) => (
               <div key={item.id}>
                 <button
                   onClick={() => handleNavigation(item)}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors ${
+                  className={`w-full flex items-center justify-between px-3 py-3 rounded-lg text-sm transition-colors ${
                     isActive(item.path)
                       ? 'bg-[#622578] text-white'
                       : 'text-gray-300 hover:bg-gray-800 hover:text-white'
@@ -85,9 +100,9 @@ export default function ClientDashboard() {
                   )}
                 </button>
 
-                {/* Dropdown Menu */}
+                {/* Dropdown Menu (renders inline so it won't produce a scroll bar) */}
                 {item.hasDropdown && isGigsOpen && (
-                  <div className="ml-4 mt-1 space-y-1">
+                  <div className="ml-4 mt-1 space-y-2">
                     {item.subItems.map((subItem) => (
                       <button
                         key={subItem.id}
@@ -109,15 +124,23 @@ export default function ClientDashboard() {
           </div>
         </nav>
 
+        {/* Single Divider before Upgrade Section */}
+        <div className="border-t border-gray-800 mx-3 mb-3"></div>
+
         {/* Upgrade Section */}
-        <div className="p-4 border-t border-gray-800">
-          <div className="bg-gray-800 rounded-lg p-4 text-center">
-            <p className="text-gray-300 text-sm mb-3">
-              Ready to go beyond this free plan? Upgrade for premium features.
-            </p>
-            <button className="w-full bg-[#622578] hover:bg-[#7a2e94] text-white font-medium py-2 px-4 rounded-lg transition-colors">
-              View plans
-            </button>
+        <div className="p-3 mx-2 mb-3 bg-[#622578]/10 border border-[#622578]/30 rounded-lg">
+          <p className="text-xs text-gray-400 mb-2">Client Account</p>
+          <div
+            onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+            className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+          >
+            <div className="bg-[#622578] w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-semibold">
+              U
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-white truncate">User Name</p>
+              <p className="text-xs text-gray-400">Wallet: ****3950</p>
+            </div>
           </div>
         </div>
       </div>
@@ -131,7 +154,7 @@ export default function ClientDashboard() {
       {isUserMenuOpen && (
         <>
           {/* Backdrop */}
-          <div 
+          <div
             className="fixed inset-0 bg-black/20 z-40"
             onClick={() => setIsUserMenuOpen(false)}
           ></div>
@@ -140,18 +163,22 @@ export default function ClientDashboard() {
           <div className="fixed top-20 left-4 w-72 bg-white rounded-xl shadow-2xl z-50 border border-gray-200">
             {/* Workspaces Section */}
             <div className="p-4">
-              <p className="text-xs text-gray-500 font-semibold mb-3">CLIENT ACCOUNT</p>
+              <p className="text-xs text-gray-500 font-semibold mb-3">
+                CLIENT ACCOUNT
+              </p>
               <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                 <div className="flex items-center space-x-3">
                   <div className="w-8 h-8 rounded-full bg-[#622578] flex items-center justify-center text-white text-xs font-semibold">
                     U
                   </div>
                   <div>
-                    <p className="text-gray-900 text-sm font-medium">User's Workspace</p>
+                    <p className="text-gray-900 text-sm font-medium">
+                      User's Workspace
+                    </p>
                     <p className="text-gray-500 text-xs">FREE</p>
                   </div>
                 </div>
-                <button 
+                <button
                   onClick={() => {
                     navigate('/client-dashboard/profile');
                     setIsUserMenuOpen(false);
@@ -165,9 +192,8 @@ export default function ClientDashboard() {
 
             {/* Logout Button */}
             <div className="p-4 border-t border-gray-200">
-              <button 
+              <button
                 onClick={() => {
-                  // Add logout logic here
                   console.log('Logging out...');
                   setIsUserMenuOpen(false);
                 }}

@@ -271,6 +271,14 @@ export default function CreateProfile() {
               <p>Please connect your wallet first</p>
             </div>
           )}
+
+           {/* Login Link */}
+          <p className="mt-6 text-gray-400">
+            Already have an account?{' '}
+            <a href="login" className="text-[#622578] font-medium hover:underline">
+              Log In
+            </a>
+          </p>
         </div>
       </div>
     );

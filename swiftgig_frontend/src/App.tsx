@@ -1,13 +1,11 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ConnectButton } from "@mysten/dapp-kit";
-import SwiftGigSignUp from './components/auth/SwiftGigSignUp';
+import Login from './components/auth/Login';
 import EmailVerifyPage from './components/auth/EmailVerifyPage';
 import TalentAuth from './components/auth/TalentAuth';
 import ClientAuth from './components/auth/ClientAuth';
 import { InitializeRegistry } from './components/auth/registry';
 import CreateProfile from './components/auth/profilecreation';
-import RegisterFlow1 from './components/auth/RegisterFlow1';
-import RegisterFlow2 from './components/auth/RegisterFlow2';
 import ClientDashboard from './pages/ClientDashboard/ClientDashboard';
 import DashboardHome from './pages/ClientDashboard/DashboardHome';
 import TalentDashboard from './pages/TalentDashboard/TalentDashboard';
@@ -19,7 +17,8 @@ import Gigs from './pages/TalentDashboard/Gigs'
 import VotingPoll from './pages/TalentDashboard/VotingPoll'
 import DashboardProfile from './pages/TalentDashboard/DashboardProfile'
 import DashboardSettings from './pages/TalentDashboard/DashboardSettings'
-
+import ClientProfile from './pages/ClientDashboard/ClientProfile';
+import ClientSettings from './pages/ClientDashboard/ClientSettings';
 
 
 function LandingPage() {
@@ -61,14 +60,12 @@ export default function App() {
     <Router>
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route path="/signup" element={<SwiftGigSignUp />} />
+        <Route path="/login" element={<Login/>} />
         <Route path="/initialize-registry" element={<InitializeRegistry />} />
         <Route path="/create-profile" element={<CreateProfile />} />
         <Route path="/verify" element={<EmailVerifyPage />} />
         <Route path="/talent-auth" element={<TalentAuth />} />
         <Route path="/client-auth" element={<ClientAuth />} />
-        <Route path="/register/client" element={<RegisterFlow1 />} />
-        <Route path="/register/talent" element={<RegisterFlow2 />} />
         
         {/* Client Dashboard Routes */}
         <Route path="/client-dashboard/*" element={<ClientDashboard />}>
@@ -76,6 +73,8 @@ export default function App() {
           <Route path="create-gigs" element={<CreateGigs />} />
           <Route path="your-gigs" element={<YourGigs />} /> 
           <Route path="disputes" element={<Disputes />} />
+          <Route path="settings" element={<ClientSettings />} />
+          <Route path="profile" element={<ClientProfile />} />
         </Route>
 
         {/* Talent Dashboard Routes */}
