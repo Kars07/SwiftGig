@@ -64,8 +64,8 @@ export default function ClientDashboard() {
               U
             </div>
             <div className="flex-1 text-left">
-              <h3 className="text-white font-medium text-sm">User</h3>
-              <p className="text-gray-400 text-xs">FREE</p>
+              <h3 className="text-white font-medium text-sm">John Doe</h3>
+              <p className="text-gray-400 text-xs">Client</p>
             </div>
             <ChevronDown
               className={`w-4 h-4 text-gray-400 transition-transform ${
@@ -133,18 +133,6 @@ export default function ClientDashboard() {
         {/* Upgrade Section */}
         <div className="p-3 mx-2 mb-3 bg-[#622578]/10 border border-[#622578]/30 rounded-lg">
           <p className="text-xs text-gray-400 mb-2">Client Account</p>
-          <div
-            onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-            className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
-          >
-            <div className="bg-[#622578] w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-semibold">
-              U
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-white truncate">User Name</p>
-              <p className="text-xs text-gray-400">Wallet: ****3950</p>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -176,9 +164,9 @@ export default function ClientDashboard() {
                   </div>
                   <div>
                     <p className="text-gray-900 text-sm font-medium">
-                      User's Workspace
+                      User Name
                     </p>
-                    <p className="text-gray-500 text-xs">FREE</p>
+                    <p className="text-gray-500 text-xs">wallet: *****3950</p>
                   </div>
                 </div>
                 <button

@@ -47,7 +47,7 @@ function LandingPage() {
         <h2 className="text-5xl font-bold text-black mb-4">SwiftGig</h2>
         <p className="text-xl text-gray-600 mb-8">Your freelancing platform</p>
         <a
-          href="/signup"
+          href="/create-profile"
           className="inline-block px-8 py-3 bg-[#622578] text-white rounded-full font-medium hover:bg-[#622578]/90 transition-all"
         >
           Get Started
