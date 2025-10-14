@@ -40,6 +40,14 @@ export default function ReviewSubmission() {
   const [distributingRewards, setDistributingRewards] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
 
+  // Gig state constants
+  const GIG_ACTIVE = 0;
+  const GIG_SUBMITTED = 1;
+  const GIG_REVIEW_SATISFIED = 2;
+  const GIG_REVIEW_UNSATISFIED = 3;
+  const GIG_DISPUTED = 4;
+  const GIG_CLOSED = 5;
+
   useEffect(() => {
     if (account?.address) {
       fetchGigsWithSubmissions();
@@ -85,8 +93,15 @@ export default function ReviewSubmission() {
               const deadline = parseInt(metadata?.deadline) || 0;
               const state = parseInt(fields.state) || 0;
 
-              // Get client satisfaction status
-              const clientSatisfaction = fields.client_satisfaction?.vec?.[0] ?? null;
+              // Parse client satisfaction - handle Option<bool>
+              let clientSatisfaction: boolean | null = null;
+              if (fields.client_satisfaction) {
+                if (fields.client_satisfaction.vec && fields.client_satisfaction.vec.length > 0) {
+                  clientSatisfaction = fields.client_satisfaction.vec[0];
+                } else if (typeof fields.client_satisfaction === 'boolean') {
+                  clientSatisfaction = fields.client_satisfaction;
+                }
+              }
 
               // Parse submissions
               const rawSubmissions = fields.submissions || [];
@@ -107,8 +122,8 @@ export default function ReviewSubmission() {
                 });
               }
 
-              // Only include gigs that have submissions and are in submitted state OR approved state
-              if (submissions.length > 0 && (state === 1 || state === 2)) {
+              // Include gigs that have submissions and are in submitted or review_satisfied state
+              if (submissions.length > 0 && (state === GIG_SUBMITTED || state === GIG_REVIEW_SATISFIED)) {
                 clientGigs.push({
                   id: eventData.gig_id,
                   name: name || "Unnamed Gig",
@@ -184,7 +199,7 @@ export default function ReviewSubmission() {
           },
           onSuccess: () => {
             const message = reviewType === 'approve' 
-              ? 'Work approved! Payment will be distributed 🎉'
+              ? 'Work approved! Click "Distribute Rewards" to send payment 🎉'
               : 'Work rejected. Talent can contest this decision';
             showNotif(message);
             setIsReviewModalOpen(false);
@@ -293,35 +308,18 @@ export default function ReviewSubmission() {
                 className="bg-[#0f0f0f] border border-gray-800 rounded-xl p-6 hover:border-[#622578] transition-colors"
               >
                 <div className="mb-6">
-                  <h3 className="text-2xl font-semibold text-white mb-2">{gig.name}</h3>
-                  <p className="text-gray-400 text-sm mb-3">{gig.description}</p>
-                  
-                  <div className="flex items-center space-x-6 text-sm">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-gray-400">Amount:</span>
-                      <span className="font-bold text-[#622578]">{gig.amount} SUI</span>
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1">
+                      <h3 className="text-2xl font-semibold text-white mb-2">{gig.name}</h3>
+                      <p className="text-gray-400 text-sm mb-3">{gig.description}</p>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-gray-400">Deadline:</span>
-                      <span className="font-semibold text-white">{gig.deadline}</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-gray-400">Submissions:</span>
-                      <span className="font-semibold text-white">{gig.submissions.length}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">
-                      Submitted Work ({gig.submissions.length})
-                    </h4>
-                    {gig.state === 2 && gig.clientSatisfaction === true && (
+                    
+                    {/* Show Distribute Rewards button if work is approved */}
+                    {gig.state === GIG_REVIEW_SATISFIED && gig.clientSatisfaction === true && (
                       <button
                         onClick={() => handleDistributeRewards(gig.id)}
                         disabled={distributingRewards}
-                        className="flex items-center space-x-2 bg-[#622578] hover:bg-[#7a2e94] text-white font-semibold px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="ml-4 flex items-center space-x-2 bg-[#622578] hover:bg-[#7a2e94] text-white font-semibold px-5 py-2.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                       >
                         {distributingRewards ? (
                           <>
@@ -337,6 +335,36 @@ export default function ReviewSubmission() {
                       </button>
                     )}
                   </div>
+                  
+                  <div className="flex items-center space-x-6 text-sm">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-gray-400">Amount:</span>
+                      <span className="font-bold text-[#622578]">{gig.amount} SUI</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-gray-400">Deadline:</span>
+                      <span className="font-semibold text-white">{gig.deadline}</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-gray-400">Submissions:</span>
+                      <span className="font-semibold text-white">{gig.submissions.length}</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-gray-400">Status:</span>
+                      {gig.state === GIG_SUBMITTED && (
+                        <span className="text-yellow-400 font-semibold">Pending Review</span>
+                      )}
+                      {gig.state === GIG_REVIEW_SATISFIED && (
+                        <span className="text-green-400 font-semibold">Approved</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h4 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">
+                    Submitted Work ({gig.submissions.length})
+                  </h4>
 
                   {gig.submissions.map((submission, index) => (
                     <div
@@ -381,7 +409,7 @@ export default function ReviewSubmission() {
                       </div>
 
                       <div className="flex items-center space-x-3">
-                        {gig.state === 1 ? (
+                        {gig.state === GIG_SUBMITTED ? (
                           <>
                             <button
                               onClick={() => handleReviewClick(gig, submission, 'approve')}
@@ -398,7 +426,7 @@ export default function ReviewSubmission() {
                               <span>Reject</span>
                             </button>
                           </>
-                        ) : gig.state === 2 ? (
+                        ) : gig.state === GIG_REVIEW_SATISFIED ? (
                           <div className="w-full bg-green-500/10 border border-green-500 rounded-lg p-3 flex items-center justify-center space-x-2">
                             <CheckCircle className="w-5 h-5 text-green-500" />
                             <span className="text-green-500 font-semibold">Work Approved - Ready to Distribute</span>
@@ -445,7 +473,7 @@ export default function ReviewSubmission() {
                         <h4 className="text-green-400 font-semibold text-sm mb-2">Confirm Approval</h4>
                         <p className="text-green-300 text-sm leading-relaxed">
                           By approving this work, you confirm that you are satisfied with the results. 
-                          The payment will be distributed to the talents from the gig treasury.
+                          After approval, you'll need to click "Distribute Rewards" to send the payment to talents.
                         </p>
                       </div>
                     </div>
@@ -457,7 +485,7 @@ export default function ReviewSubmission() {
                       <div>
                         <h4 className="text-yellow-400 font-semibold text-sm mb-2">Important Notice</h4>
                         <p className="text-yellow-300 text-xs leading-relaxed">
-                          The talent can contest your decision within 2 days. If contested, a community poll 
+                          The talent can contest your decision. If contested, a community poll 
                           will determine the outcome. If not contested, your payment will be refunded.
                         </p>
                       </div>
