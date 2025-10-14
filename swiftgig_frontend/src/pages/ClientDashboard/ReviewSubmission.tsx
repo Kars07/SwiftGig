@@ -20,6 +20,7 @@ interface Gig {
   submissions: Submission[];
   state: number;
   acceptedTalents: string[];
+  clientSatisfaction: boolean | null;
 }
 
 export default function ReviewSubmission() {
@@ -36,6 +37,7 @@ export default function ReviewSubmission() {
   const [reviewType, setReviewType] = useState<'approve' | 'reject' | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [reviewing, setReviewing] = useState(false);
+  const [distributingRewards, setDistributingRewards] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
@@ -83,6 +85,9 @@ export default function ReviewSubmission() {
               const deadline = parseInt(metadata?.deadline) || 0;
               const state = parseInt(fields.state) || 0;
 
+              // Get client satisfaction status
+              const clientSatisfaction = fields.client_satisfaction?.vec?.[0] ?? null;
+
               // Parse submissions
               const rawSubmissions = fields.submissions || [];
               const submissions: Submission[] = [];
@@ -102,8 +107,8 @@ export default function ReviewSubmission() {
                 });
               }
 
-              // Only include gigs that have submissions and are in submitted state
-              if (submissions.length > 0 && state === 1) {
+              // Only include gigs that have submissions and are in submitted state OR approved state
+              if (submissions.length > 0 && (state === 1 || state === 2)) {
                 clientGigs.push({
                   id: eventData.gig_id,
                   name: name || "Unnamed Gig",
@@ -113,6 +118,7 @@ export default function ReviewSubmission() {
                   submissions,
                   state,
                   acceptedTalents: fields.accepted_talents || [],
+                  clientSatisfaction,
                 });
               }
             }
@@ -198,6 +204,45 @@ export default function ReviewSubmission() {
     }
   };
 
+  const handleDistributeRewards = async (gigId: string) => {
+    if (!account) return;
+
+    setDistributingRewards(true);
+    const tx = new Transaction();
+
+    try {
+      tx.moveCall({
+        target: `${PACKAGE_ID}::swiftgig::distribute_rewards`,
+        arguments: [
+          tx.object(gigId),
+        ],
+      });
+
+      signAndExecute(
+        { transaction: tx },
+        {
+          onError: (err) => {
+            console.error('Distribute rewards error:', err);
+            showNotif('Failed to distribute rewards. Try again');
+            setDistributingRewards(false);
+          },
+          onSuccess: () => {
+            showNotif('Rewards distributed successfully! 💰🎉');
+            setDistributingRewards(false);
+
+            setTimeout(() => {
+              fetchGigsWithSubmissions();
+            }, 2000);
+          },
+        }
+      );
+    } catch (error) {
+      console.error('Transaction error:', error);
+      showNotif('Transaction failed');
+      setDistributingRewards(false);
+    }
+  };
+
   if (!account) {
     return (
       <div className="min-h-screen bg-[#1a1a1a] flex items-center justify-center p-8">
@@ -268,9 +313,30 @@ export default function ReviewSubmission() {
                 </div>
 
                 <div className="space-y-4">
-                  <h4 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">
-                    Submitted Work ({gig.submissions.length})
-                  </h4>
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">
+                      Submitted Work ({gig.submissions.length})
+                    </h4>
+                    {gig.state === 2 && gig.clientSatisfaction === true && (
+                      <button
+                        onClick={() => handleDistributeRewards(gig.id)}
+                        disabled={distributingRewards}
+                        className="flex items-center space-x-2 bg-[#622578] hover:bg-[#7a2e94] text-white font-semibold px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {distributingRewards ? (
+                          <>
+                            <Loader className="w-4 h-4 animate-spin" />
+                            <span className="text-sm">Distributing...</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle className="w-4 h-4" />
+                            <span className="text-sm">Distribute Rewards</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
 
                   {gig.submissions.map((submission, index) => (
                     <div
@@ -315,20 +381,29 @@ export default function ReviewSubmission() {
                       </div>
 
                       <div className="flex items-center space-x-3">
-                        <button
-                          onClick={() => handleReviewClick(gig, submission, 'approve')}
-                          className="flex-1 flex items-center justify-center space-x-2 bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-3 rounded-lg transition-colors"
-                        >
-                          <CheckCircle className="w-5 h-5" />
-                          <span>Approve</span>
-                        </button>
-                        <button
-                          onClick={() => handleReviewClick(gig, submission, 'reject')}
-                          className="flex-1 flex items-center justify-center space-x-2 bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-3 rounded-lg transition-colors"
-                        >
-                          <XCircle className="w-5 h-5" />
-                          <span>Reject</span>
-                        </button>
+                        {gig.state === 1 ? (
+                          <>
+                            <button
+                              onClick={() => handleReviewClick(gig, submission, 'approve')}
+                              className="flex-1 flex items-center justify-center space-x-2 bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-3 rounded-lg transition-colors"
+                            >
+                              <CheckCircle className="w-5 h-5" />
+                              <span>Approve</span>
+                            </button>
+                            <button
+                              onClick={() => handleReviewClick(gig, submission, 'reject')}
+                              className="flex-1 flex items-center justify-center space-x-2 bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-3 rounded-lg transition-colors"
+                            >
+                              <XCircle className="w-5 h-5" />
+                              <span>Reject</span>
+                            </button>
+                          </>
+                        ) : gig.state === 2 ? (
+                          <div className="w-full bg-green-500/10 border border-green-500 rounded-lg p-3 flex items-center justify-center space-x-2">
+                            <CheckCircle className="w-5 h-5 text-green-500" />
+                            <span className="text-green-500 font-semibold">Work Approved - Ready to Distribute</span>
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                   ))}
