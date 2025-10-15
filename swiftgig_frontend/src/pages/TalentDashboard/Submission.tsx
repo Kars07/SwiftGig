@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, CheckCircle, Clock, AlertCircle, X, Loader, ExternalLink } from 'lucide-react';
+import { Upload, CheckCircle, Clock, AlertCircle, X, Loader, ExternalLink, XCircle, MessageSquare, RefreshCw } from 'lucide-react';
 import { useCurrentAccount, useSignAndExecuteTransaction, useSuiClient } from '@mysten/dapp-kit';
 import { Transaction } from '@mysten/sui/transactions';
 
@@ -16,7 +16,17 @@ interface Gig {
   submissionLink?: string;
   submissionTimestamp?: string;
   state: number;
+  clientSatisfaction: boolean | null;
+  unsatisfactionReason?: string;
 }
+
+// Gig state constants
+const GIG_ACTIVE = 0;
+const GIG_SUBMITTED = 1;
+const GIG_REVIEW_SATISFIED = 2;
+const GIG_REVIEW_UNSATISFIED = 3;
+const GIG_DISPUTED = 4;
+const GIG_CLOSED = 5;
 
 export default function Submission() {
   const account = useCurrentAccount();
@@ -27,8 +37,12 @@ export default function Submission() {
   const [loadingGigs, setLoadingGigs] = useState(false);
   const [selectedGig, setSelectedGig] = useState<Gig | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isContestModalOpen, setIsContestModalOpen] = useState(false);
   const [submissionLink, setSubmissionLink] = useState('');
+  const [contestReason, setContestReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [contesting, setContesting] = useState(false);
+  const [processing, setProcessing] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
@@ -75,6 +89,26 @@ export default function Submission() {
 
               const deadline = parseInt(metadata?.deadline) || 0;
               const state = parseInt(fields.state) || 0;
+
+              // Get client satisfaction and unsatisfaction reason
+              let clientSatisfaction: boolean | null = null;
+              if (fields.client_satisfaction) {
+                if (fields.client_satisfaction.vec && fields.client_satisfaction.vec.length > 0) {
+                  clientSatisfaction = fields.client_satisfaction.vec[0];
+                } else if (typeof fields.client_satisfaction === 'boolean') {
+                  clientSatisfaction = fields.client_satisfaction;
+                }
+              }
+
+              let unsatisfactionReason = '';
+              if (fields.unsatisfaction_reason && fields.unsatisfaction_reason.vec && fields.unsatisfaction_reason.vec.length > 0) {
+                const reasonData = fields.unsatisfaction_reason.vec[0];
+                if (reasonData.fields?.vec) {
+                  unsatisfactionReason = String.fromCharCode(...reasonData.fields.vec);
+                } else if (typeof reasonData === 'string') {
+                  unsatisfactionReason = reasonData;
+                }
+              }
 
               // Check if talent has submitted
               const submissions = fields.submissions || [];
@@ -124,6 +158,8 @@ export default function Submission() {
                 submissionLink,
                 submissionTimestamp,
                 state,
+                clientSatisfaction,
+                unsatisfactionReason,
               });
             }
           } catch (error) {
@@ -150,6 +186,12 @@ export default function Submission() {
     setSelectedGig(gig);
     setSubmissionLink('');
     setIsModalOpen(true);
+  };
+
+  const handleContestClick = (gig: Gig) => {
+    setSelectedGig(gig);
+    setContestReason('');
+    setIsContestModalOpen(true);
   };
 
   const handleSubmitWork = async () => {
@@ -200,20 +242,123 @@ export default function Submission() {
     }
   };
 
+  const handleContestDecision = async () => {
+    if (!account || !selectedGig) return;
+
+    if (!contestReason.trim()) {
+      showNotif('Please provide a reason for contesting');
+      return;
+    }
+
+    setContesting(true);
+    const tx = new Transaction();
+
+    try {
+      tx.moveCall({
+        target: `${PACKAGE_ID}::swiftgig::contest_decision`,
+        arguments: [
+          tx.object(selectedGig.id),
+          tx.pure.string(contestReason),
+          tx.object('0x6'), // Clock object
+        ],
+      });
+
+      signAndExecute(
+        { transaction: tx },
+        {
+          onError: (err) => {
+            console.error('Contest error:', err);
+            showNotif('Failed to contest decision. Try again');
+            setContesting(false);
+          },
+          onSuccess: () => {
+            showNotif('Dispute created successfully! Community will vote 🗳️');
+            setIsContestModalOpen(false);
+            setContesting(false);
+            setContestReason('');
+
+            setTimeout(() => {
+              fetchAcceptedGigs();
+            }, 2000);
+          },
+        }
+      );
+    } catch (error) {
+      console.error('Transaction error:', error);
+      showNotif('Transaction failed');
+      setContesting(false);
+    }
+  };
+
+  const handleAcceptRejection = async (gigId: string) => {
+    if (!account) return;
+
+    setProcessing(true);
+    const tx = new Transaction();
+
+    try {
+      tx.moveCall({
+        target: `${PACKAGE_ID}::swiftgig::refund_client`,
+        arguments: [
+          tx.object(gigId),
+        ],
+      });
+
+      signAndExecute(
+        { transaction: tx },
+        {
+          onError: (err) => {
+            console.error('Refund client error:', err);
+            showNotif('Failed to process refund. Try again');
+            setProcessing(false);
+          },
+          onSuccess: () => {
+            showNotif('Client refunded successfully. Gig closed.');
+            setProcessing(false);
+
+            setTimeout(() => {
+              fetchAcceptedGigs();
+            }, 2000);
+          },
+        }
+      );
+    } catch (error) {
+      console.error('Transaction error:', error);
+      showNotif('Transaction failed');
+      setProcessing(false);
+    }
+  };
+
   const getStatusBadge = (gig: Gig) => {
+    if (gig.state === GIG_DISPUTED) {
+      return (
+        <span className="flex items-center space-x-1 bg-orange-500/20 text-orange-400 text-xs font-semibold px-3 py-1 rounded-full">
+          <MessageSquare className="w-3 h-3" />
+          <span>In Dispute</span>
+        </span>
+      );
+    }
+    
     if (gig.hasSubmitted) {
-      if (gig.state === 2) {
+      if (gig.state === GIG_REVIEW_SATISFIED) {
         return (
           <span className="flex items-center space-x-1 bg-green-500/20 text-green-400 text-xs font-semibold px-3 py-1 rounded-full">
             <CheckCircle className="w-3 h-3" />
             <span>Approved</span>
           </span>
         );
-      } else if (gig.state === 3) {
+      } else if (gig.state === GIG_REVIEW_UNSATISFIED) {
         return (
           <span className="flex items-center space-x-1 bg-red-500/20 text-red-400 text-xs font-semibold px-3 py-1 rounded-full">
-            <AlertCircle className="w-3 h-3" />
+            <XCircle className="w-3 h-3" />
             <span>Rejected</span>
+          </span>
+        );
+      } else if (gig.state === GIG_CLOSED) {
+        return (
+          <span className="flex items-center space-x-1 bg-gray-500/20 text-gray-400 text-xs font-semibold px-3 py-1 rounded-full">
+            <CheckCircle className="w-3 h-3" />
+            <span>Closed</span>
           </span>
         );
       } else {
@@ -268,7 +413,7 @@ export default function Submission() {
             </div>
           </div>
         ) : gigs.length === 0 ? (
-          <div className="bg-[#2B0A2F]/70 border border-[#641374]/50  rounded-xl p-12 text-center">
+          <div className="bg-[#2B0A2F]/70 border border-[#641374]/50 rounded-xl p-12 text-center">
             <div className="w-20 h-20 bg-[#2B0A2F]/70 rounded-full flex items-center justify-center mx-auto mb-4">
               <Upload className="w-10 h-10 text-purple-400" />
             </div>
@@ -310,24 +455,70 @@ export default function Submission() {
                   )}
                 </div>
 
-                {gig.hasSubmitted ? (
-                  <div className="bg-[#1a1a1a] border border-gray-700 rounded-lg p-4">
-                    <div className="flex items-start justify-between">
+                {/* Rejection Notice */}
+                {gig.state === GIG_REVIEW_UNSATISFIED && gig.unsatisfactionReason && (
+                  <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 mb-4">
+                    <div className="flex items-start space-x-3">
+                      <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
                       <div className="flex-1">
-                        <p className="text-xs text-gray-400 mb-1">Submission Link</p>
-                        <p className="text-sm text-white break-all">{gig.submissionLink}</p>
+                        <h4 className="text-red-400 font-semibold text-sm mb-1">Rejection Reason</h4>
+                        <p className="text-red-300 text-xs leading-relaxed">{gig.unsatisfactionReason}</p>
                       </div>
-                      {gig.submissionLink && (
-                        <a
-                          href={gig.submissionLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="ml-3 text-[#622578] hover:text-[#7a2e94] transition-colors"
-                        >
-                          <ExternalLink className="w-5 h-5" />
-                        </a>
-                      )}
                     </div>
+                  </div>
+                )}
+
+                {gig.hasSubmitted ? (
+                  <div className="space-y-3">
+                    <div className="bg-[#1a1a1a] border border-gray-700 rounded-lg p-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <p className="text-xs text-gray-400 mb-1">Submission Link</p>
+                          <p className="text-sm text-white break-all">{gig.submissionLink}</p>
+                        </div>
+                        {gig.submissionLink && (
+                          <a
+                            href={gig.submissionLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="ml-3 text-[#622578] hover:text-[#7a2e94] transition-colors"
+                          >
+                            <ExternalLink className="w-5 h-5" />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Action buttons for rejected work */}
+                    {gig.state === GIG_REVIEW_UNSATISFIED && (
+                      <div className="flex items-center space-x-3">
+                        <button
+                          onClick={() => handleContestClick(gig)}
+                          disabled={processing}
+                          className="flex-1 flex items-center justify-center space-x-2 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white font-semibold px-4 py-3 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+                        >
+                          <MessageSquare className="w-5 h-5" />
+                          <span>Contest Decision</span>
+                        </button>
+                        <button
+                          onClick={() => handleAcceptRejection(gig.id)}
+                          disabled={processing}
+                          className="flex-1 flex items-center justify-center space-x-2 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-semibold px-4 py-3 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+                        >
+                          {processing ? (
+                            <>
+                              <Loader className="w-5 h-5 animate-spin" />
+                              <span>Processing...</span>
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle className="w-5 h-5" />
+                              <span>Accept & Close</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <button
@@ -432,6 +623,113 @@ export default function Submission() {
                       <>
                         <Upload className="w-4 h-4" />
                         <span>Submit Work</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Contest Decision Modal */}
+      {isContestModalOpen && selectedGig && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/50 z-40"
+            onClick={() => !contesting && setIsContestModalOpen(false)}
+          />
+          <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+            <div className="bg-[#0f0f0f] border border-gray-800 rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between p-6 border-b border-gray-800">
+                <div>
+                  <h2 className="text-2xl font-bold text-white">Contest Rejection</h2>
+                  <p className="text-gray-400 text-sm mt-1">Create a dispute for community voting</p>
+                </div>
+                <button
+                  onClick={() => !contesting && setIsContestModalOpen(false)}
+                  disabled={contesting}
+                  className="text-gray-400 hover:text-white transition-colors disabled:opacity-50"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-6">
+                <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-4">
+                  <div className="flex items-start space-x-3">
+                    <MessageSquare className="w-5 h-5 text-orange-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="text-orange-400 font-semibold text-sm mb-1">Community Dispute</h4>
+                      <p className="text-orange-300 text-xs leading-relaxed">
+                        By contesting this decision, a poll will be created where community members with high credibility (≥70) 
+                        can vote. The voting period lasts 7 days. If you win, you'll receive the payment.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-[#1a1a1a] border border-gray-700 rounded-lg p-4">
+                  <h5 className="text-sm font-semibold text-white mb-3">Gig Details</h5>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-400">Gig</span>
+                      <span className="text-sm text-white font-medium">{selectedGig.name}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-400">Amount</span>
+                      <span className="text-lg font-bold text-[#622578]">{selectedGig.amount} SUI</span>
+                    </div>
+                  </div>
+                </div>
+
+                {selectedGig.unsatisfactionReason && (
+                  <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+                    <h5 className="text-sm font-semibold text-red-400 mb-2">Client's Rejection Reason</h5>
+                    <p className="text-red-300 text-xs leading-relaxed">{selectedGig.unsatisfactionReason}</p>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Your Response / Contest Reason *
+                  </label>
+                  <textarea
+                    value={contestReason}
+                    onChange={(e) => setContestReason(e.target.value)}
+                    rows={4}
+                    placeholder="Explain why you disagree with the client's decision..."
+                    className="w-full bg-[#1a1a1a] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#622578] transition-colors resize-none"
+                    disabled={contesting}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Be clear and professional. The community will review both sides.
+                  </p>
+                </div>
+
+                <div className="flex items-center space-x-3 pt-4 border-t border-gray-800">
+                  <button
+                    onClick={() => setIsContestModalOpen(false)}
+                    disabled={contesting}
+                    className="flex-1 px-6 py-3 text-gray-400 hover:text-white border border-gray-700 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleContestDecision}
+                    disabled={contesting || !contestReason.trim()}
+                    className="flex-1 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white font-semibold px-6 py-3 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg"
+                  >
+                    {contesting ? (
+                      <>
+                        <Loader className="w-4 h-4 animate-spin" />
+                        <span>Creating Dispute...</span>
+                      </>
+                    ) : (
+                      <>
+                        <MessageSquare className="w-4 h-4" />
+                        <span>Create Dispute</span>
                       </>
                     )}
                   </button>
