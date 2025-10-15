@@ -76,81 +76,74 @@ export default function CreateGigs() {
 
   const fetchTalentProfiles = async () => {
     try {
-      const talentProfileEvents = await suiClient.queryEvents({
-        query: {
-          MoveEventType: `${PACKAGE_ID}::swiftgig::TalentProfileCreated`,
-        },
-        limit: 200,
+      // Fetch the registry object which contains all profiles
+      const registryObject = await suiClient.getObject({
+        id: REGISTRY_ID,
+        options: { showContent: true },
       });
 
-      const profiles = new Map<string, TalentProfile>();
+      if (registryObject.data?.content && 'fields' in registryObject.data.content) {
+        const fields = registryObject.data.content.fields as any;
+        const talentProfilesList = fields.talent_profiles || [];
 
-      for (const event of talentProfileEvents.data) {
-        const eventData = event.parsedJson as any;
-        
-        // Store profile directly from event data first (as fallback)
-        if (eventData.talent_addr) {
-          profiles.set(eventData.talent_addr, {
-            address: eventData.talent_addr,
-            name: "Loading...",
-            skill: eventData.skill || "N/A",
-            creditScore: 50,
-          });
-        }
+        const profiles = new Map<string, TalentProfile>();
 
-        // Then try to fetch the full profile object
-        try {
-          const profileObject = await suiClient.getObject({
-            id: eventData.talent_id,
-            options: { showContent: true },
-          });
+        console.log('Total talent profiles in registry:', talentProfilesList.length);
 
-          if (profileObject.data?.content && 'fields' in profileObject.data.content) {
-            const fields = profileObject.data.content.fields as any;
+        for (const profileData of talentProfilesList) {
+          try {
+            const profileFields = profileData.fields || profileData;
             
-            // Try multiple ways to extract the name
+            // Extract talent address
+            const talentAddr = profileFields.talent_addr;
+            
+            // Extract full name
             let name = "Unknown";
-            if (fields.full_name) {
-              if (fields.full_name.fields?.vec) {
-                name = String.fromCharCode(...fields.full_name.fields.vec);
-              } else if (typeof fields.full_name === 'string') {
-                name = fields.full_name;
+            if (profileFields.full_name) {
+              if (profileFields.full_name.fields?.vec) {
+                name = String.fromCharCode(...profileFields.full_name.fields.vec);
+              } else if (typeof profileFields.full_name === 'string') {
+                name = profileFields.full_name;
               }
             }
             
-            // Try multiple ways to extract the skill
+            // Extract skill
             let skill = "N/A";
-            if (fields.skill) {
-              if (fields.skill.fields?.vec) {
-                skill = String.fromCharCode(...fields.skill.fields.vec);
-              } else if (typeof fields.skill === 'string') {
-                skill = fields.skill;
+            if (profileFields.skill) {
+              if (profileFields.skill.fields?.vec) {
+                skill = String.fromCharCode(...profileFields.skill.fields.vec);
+              } else if (typeof profileFields.skill === 'string') {
+                skill = profileFields.skill;
               }
             }
 
-            console.log('Fetched talent profile:', {
-              address: eventData.talent_addr,
+            const credibility = parseInt(profileFields.credibility_score) || 50;
+
+            console.log('Parsed talent profile:', {
+              address: talentAddr,
               name,
               skill,
-              credibility: fields.credibility_score
+              credibility
             });
 
-            profiles.set(eventData.talent_addr, {
-              address: eventData.talent_addr,
-              name,
-              skill,
-              creditScore: parseInt(fields.credibility_score) || 50,
-            });
+            if (talentAddr) {
+              profiles.set(talentAddr, {
+                address: talentAddr,
+                name,
+                skill,
+                creditScore: credibility,
+              });
+            }
+          } catch (error) {
+            console.warn('Error parsing profile:', error);
           }
-        } catch (error) {
-          console.warn(`Could not fetch profile ${eventData.talent_id}:`, error);
         }
-      }
 
-      console.log('Total talent profiles fetched:', profiles.size);
-      setTalentProfiles(profiles);
+        console.log('Successfully loaded profiles:', profiles.size);
+        setTalentProfiles(profiles);
+      }
     } catch (error) {
-      console.error('Error fetching talent profiles:', error);
+      console.error('Error fetching talent profiles from registry:', error);
     }
   };
 

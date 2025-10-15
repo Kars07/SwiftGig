@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle, XCircle, ExternalLink, Eye, X, Loader, AlertTriangle } from 'lucide-react';
+import { CheckCircle, XCircle, ExternalLink, Eye, X, Loader, AlertTriangle, Briefcase, Calendar, DollarSign } from 'lucide-react';
 import { useCurrentAccount, useSignAndExecuteTransaction, useSuiClient } from '@mysten/dapp-kit';
 import { Transaction } from '@mysten/sui/transactions';
 
@@ -23,6 +23,21 @@ interface Gig {
   clientSatisfaction: boolean | null;
 }
 
+interface NotificationProps {
+  message: string;
+  show: boolean;
+}
+
+const Notification: React.FC<NotificationProps> = ({ message, show }) => {
+  if (!show) return null;
+  
+  return (
+    <div className="fixed top-4 right-4 z-[60] bg-purple-600 text-white px-6 py-3 rounded-lg shadow-lg animate-fade-in">
+      {message}
+    </div>
+  );
+};
+
 export default function ReviewSubmission() {
   const account = useCurrentAccount();
   const { mutate: signAndExecute } = useSignAndExecuteTransaction();
@@ -38,7 +53,8 @@ export default function ReviewSubmission() {
   const [rejectionReason, setRejectionReason] = useState('');
   const [reviewing, setReviewing] = useState(false);
   const [distributingRewards, setDistributingRewards] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
+  const [showNotification, setShowNotification] = useState(false);
+  const [notificationMsg, setNotificationMsg] = useState('');
 
   // Gig state constants
   const GIG_ACTIVE = 0;
@@ -93,7 +109,6 @@ export default function ReviewSubmission() {
               const deadline = parseInt(metadata?.deadline) || 0;
               const state = parseInt(fields.state) || 0;
 
-              // Parse client satisfaction - handle Option<bool>
               let clientSatisfaction: boolean | null = null;
               if (fields.client_satisfaction) {
                 if (fields.client_satisfaction.vec && fields.client_satisfaction.vec.length > 0) {
@@ -103,7 +118,6 @@ export default function ReviewSubmission() {
                 }
               }
 
-              // Parse submissions
               const rawSubmissions = fields.submissions || [];
               const submissions: Submission[] = [];
 
@@ -122,7 +136,6 @@ export default function ReviewSubmission() {
                 });
               }
 
-              // Include gigs that have submissions and are in submitted or review_satisfied state
               if (submissions.length > 0 && (state === GIG_SUBMITTED || state === GIG_REVIEW_SATISFIED)) {
                 clientGigs.push({
                   id: eventData.gig_id,
@@ -153,8 +166,9 @@ export default function ReviewSubmission() {
   };
 
   const showNotif = (msg: string) => {
-    setSuccessMessage(msg);
-    setTimeout(() => setSuccessMessage(''), 4000);
+    setNotificationMsg(msg);
+    setShowNotification(true);
+    setTimeout(() => setShowNotification(false), 4000);
   };
 
   const handleReviewClick = (gig: Gig, submission: Submission, type: 'approve' | 'reject') => {
@@ -260,10 +274,10 @@ export default function ReviewSubmission() {
 
   if (!account) {
     return (
-      <div className="min-h-screen bg-[#1a1a1a] flex items-center justify-center p-8">
+      <div className="w-full min-h-screen bg-[#1A031F] px-4 md:pl-10 py-6 flex items-center justify-center">
         <div className="text-center">
-          <Eye className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-white mb-2">Connect Wallet</h3>
+          <Eye className="w-12 h-12 text-purple-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-semibold mb-2 text-white">Connect Wallet</h2>
           <p className="text-gray-400">Please connect your wallet to review submissions</p>
         </div>
       </div>
@@ -271,30 +285,52 @@ export default function ReviewSubmission() {
   }
 
   return (
-    <div className="min-h-screen bg-[#1a1a1a] p-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Review Submissions</h1>
-          <p className="text-gray-400">Review and approve or reject work submitted by talents</p>
+    <div className="w-full min-h-screen bg-[#1A031F]">
+      <div className="px-4 md:pl-10 py-6 text-white">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+          <div>
+            <h1 className="text-purple-400 text-sm">Client Dashboard</h1>
+            <h1 className="text-white font-bold mt-2 md:mt-4 text-xl">Review Submissions</h1>
+          </div>
         </div>
 
-        {successMessage && (
-          <div className="mb-6 bg-green-500/10 border border-green-500 rounded-lg p-4 flex items-center space-x-3">
-            <CheckCircle className="w-5 h-5 text-green-500" />
-            <p className="text-green-500 font-medium">{successMessage}</p>
-          </div>
-        )}
-
-        {loadingGigs ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="text-center">
-              <Loader className="w-8 h-8 text-purple-400 mx-auto mb-3 animate-spin" />
-              <p className="text-gray-400">Loading submissions...</p>
+        {/* Stats Section */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+          <div className="bg-[#2B0A2F]/70 p-5 rounded-2xl border border-[#641374]/50 flex justify-between items-center">
+            <div>
+              <h3 className="text-gray-400 text-sm">Total Submissions</h3>
+              <p className="text-2xl font-bold">{gigs.reduce((sum, g) => sum + g.submissions.length, 0)}</p>
             </div>
+            <Briefcase className="text-purple-400 w-8 h-8" />
+          </div>
+          <div className="bg-[#2B0A2F]/70 p-5 rounded-2xl border border-[#641374]/50 flex justify-between items-center">
+            <div>
+              <h3 className="text-gray-400 text-sm">Pending Review</h3>
+              <p className="text-2xl font-bold">{gigs.filter(g => g.state === GIG_SUBMITTED).length}</p>
+            </div>
+            <Eye className="text-purple-400 w-8 h-8" />
+          </div>
+          <div className="bg-[#2B0A2F]/70 p-5 rounded-2xl border border-[#641374]/50 flex justify-between items-center">
+            <div>
+              <h3 className="text-gray-400 text-sm">Approved</h3>
+              <p className="text-2xl font-bold">{gigs.filter(g => g.state === GIG_REVIEW_SATISFIED).length}</p>
+            </div>
+            <CheckCircle className="text-purple-400 w-8 h-8" />
+          </div>
+        </div>
+
+        <Notification message={notificationMsg} show={showNotification} />
+
+        {/* Content Section */}
+        {loadingGigs ? (
+          <div className="bg-[#2B0A2F]/50 rounded-2xl p-12 flex flex-col justify-center items-center">
+            <Loader className="w-8 h-8 text-purple-400 mb-3 animate-spin" />
+            <p className="text-gray-400">Loading submissions...</p>
           </div>
         ) : gigs.length === 0 ? (
-          <div className="bg-[#0f0f0f] border border-gray-800 rounded-xl p-12 text-center">
-            <div className="w-20 h-20 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
+          <div className="bg-[#2B0A2F]/50 rounded-2xl p-12 text-center">
+            <div className="w-20 h-20 bg-[#1A031F] rounded-full flex items-center justify-center mx-auto mb-4">
               <Eye className="w-10 h-10 text-gray-600" />
             </div>
             <h3 className="text-xl font-semibold text-white mb-2">No submissions to review</h3>
@@ -305,21 +341,27 @@ export default function ReviewSubmission() {
             {gigs.map((gig) => (
               <div
                 key={gig.id}
-                className="bg-[#0f0f0f] border border-gray-800 rounded-xl p-6 hover:border-[#622578] transition-colors"
+                className="bg-[#2B0A2F]/50 border border-[#641374]/50 rounded-2xl p-6 hover:border-purple-500 transition-colors"
               >
                 <div className="mb-6">
-                  <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
-                      <h3 className="text-2xl font-semibold text-white mb-2">{gig.name}</h3>
-                      <p className="text-gray-400 text-sm mb-3">{gig.description}</p>
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 to-purple-800 flex items-center justify-center text-white text-lg font-bold">
+                          {gig.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-bold text-white">{gig.name}</h3>
+                          <p className="text-gray-400 text-sm">{gig.description}</p>
+                        </div>
+                      </div>
                     </div>
                     
-                    {/* Show Distribute Rewards button if work is approved */}
                     {gig.state === GIG_REVIEW_SATISFIED && gig.clientSatisfaction === true && (
                       <button
                         onClick={() => handleDistributeRewards(gig.id)}
                         disabled={distributingRewards}
-                        className="ml-4 flex items-center space-x-2 bg-[#622578] hover:bg-[#7a2e94] text-white font-semibold px-5 py-2.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                        className="ml-4 flex items-center space-x-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-semibold px-5 py-2.5 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg whitespace-nowrap"
                       >
                         {distributingRewards ? (
                           <>
@@ -336,76 +378,84 @@ export default function ReviewSubmission() {
                     )}
                   </div>
                   
-                  <div className="flex items-center space-x-6 text-sm">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-gray-400">Amount:</span>
-                      <span className="font-bold text-[#622578]">{gig.amount} SUI</span>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="bg-[#1A031F]/50 rounded-lg p-3 border border-[#641374]/30">
+                      <div className="flex items-center gap-2 mb-1">
+                        <DollarSign className="w-4 h-4 text-purple-400" />
+                        <span className="text-xs text-gray-400">Amount</span>
+                      </div>
+                      <p className="text-sm font-bold text-purple-400">{gig.amount} SUI</p>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-gray-400">Deadline:</span>
-                      <span className="font-semibold text-white">{gig.deadline}</span>
+                    <div className="bg-[#1A031F]/50 rounded-lg p-3 border border-[#641374]/30">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Calendar className="w-4 h-4 text-purple-400" />
+                        <span className="text-xs text-gray-400">Deadline</span>
+                      </div>
+                      <p className="text-sm font-semibold text-white">{gig.deadline}</p>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-gray-400">Submissions:</span>
-                      <span className="font-semibold text-white">{gig.submissions.length}</span>
+                    <div className="bg-[#1A031F]/50 rounded-lg p-3 border border-[#641374]/30">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Briefcase className="w-4 h-4 text-purple-400" />
+                        <span className="text-xs text-gray-400">Submissions</span>
+                      </div>
+                      <p className="text-sm font-semibold text-white">{gig.submissions.length}</p>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-gray-400">Status:</span>
+                    <div className="bg-[#1A031F]/50 rounded-lg p-3 border border-[#641374]/30">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Eye className="w-4 h-4 text-purple-400" />
+                        <span className="text-xs text-gray-400">Status</span>
+                      </div>
                       {gig.state === GIG_SUBMITTED && (
-                        <span className="text-yellow-400 font-semibold">Pending Review</span>
+                        <p className="text-sm font-semibold text-yellow-400">Pending</p>
                       )}
                       {gig.state === GIG_REVIEW_SATISFIED && (
-                        <span className="text-green-400 font-semibold">Approved</span>
+                        <p className="text-sm font-semibold text-green-400">Approved</p>
                       )}
                     </div>
                   </div>
                 </div>
 
                 <div className="space-y-4">
-                  <h4 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">
-                    Submitted Work ({gig.submissions.length})
+                  <h4 className="text-sm font-semibold text-gray-300 uppercase tracking-wide flex items-center gap-2">
+                    <span>Submitted Work ({gig.submissions.length})</span>
                   </h4>
 
                   {gig.submissions.map((submission, index) => (
                     <div
                       key={index}
-                      className="bg-[#1a1a1a] border border-gray-700 rounded-lg p-5"
+                      className="bg-[#1A031F]/50 border border-[#641374]/30 rounded-xl p-5"
                     >
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex items-start space-x-4">
-                          <div className="w-12 h-12 rounded-full bg-[#622578] flex items-center justify-center text-white font-semibold flex-shrink-0">
+                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-600 to-purple-800 flex items-center justify-center text-white font-bold">
                             {submission.talent.slice(2, 4).toUpperCase()}
                           </div>
                           <div>
-                            <h5 className="text-base font-semibold text-white mb-1">
+                            <h5 className="text-base font-bold text-white mb-1">
                               {submission.talent.slice(0, 6)}...{submission.talent.slice(-4)}
                             </h5>
                             <p className="text-xs text-gray-400">Talent Address</p>
                             <p className="text-xs text-gray-500 mt-1">
-                              Submitted on {submission.timestamp}
+                              📅 Submitted on {submission.timestamp}
                             </p>
                           </div>
                         </div>
                       </div>
 
-                      <div className="mb-4 bg-[#0f0f0f] border border-gray-800 rounded-lg p-4">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <p className="text-xs text-gray-400 mb-2">Submission Link</p>
-                            <p className="text-sm text-white break-all mb-3">
-                              {submission.submissionLink}
-                            </p>
-                            <a
-                              href={submission.submissionLink}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center space-x-2 text-[#622578] hover:text-[#7a2e94] text-sm font-medium transition-colors"
-                            >
-                              <ExternalLink className="w-4 h-4" />
-                              <span>View Submission</span>
-                            </a>
-                          </div>
-                        </div>
+                      <div className="mb-4 bg-[#2B0A2F]/30 border border-[#641374]/20 rounded-lg p-4">
+                        <p className="text-xs text-gray-400 mb-2">🔗 Submission Link</p>
+                        <p className="text-sm text-white break-all mb-3 font-mono">
+                          {submission.submissionLink}
+                        </p>
+                        <a
+                          href={submission.submissionLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center space-x-2 text-purple-400 hover:text-purple-300 text-sm font-medium transition-colors"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                          <span>View Submission</span>
+                        </a>
                       </div>
 
                       <div className="flex items-center space-x-3">
@@ -413,23 +463,23 @@ export default function ReviewSubmission() {
                           <>
                             <button
                               onClick={() => handleReviewClick(gig, submission, 'approve')}
-                              className="flex-1 flex items-center justify-center space-x-2 bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-3 rounded-lg transition-colors"
+                              className="flex-1 flex items-center justify-center space-x-2 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold px-4 py-3 rounded-xl transition-all shadow-lg"
                             >
                               <CheckCircle className="w-5 h-5" />
                               <span>Approve</span>
                             </button>
                             <button
                               onClick={() => handleReviewClick(gig, submission, 'reject')}
-                              className="flex-1 flex items-center justify-center space-x-2 bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-3 rounded-lg transition-colors"
+                              className="flex-1 flex items-center justify-center space-x-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold px-4 py-3 rounded-xl transition-all shadow-lg"
                             >
                               <XCircle className="w-5 h-5" />
                               <span>Reject</span>
                             </button>
                           </>
                         ) : gig.state === GIG_REVIEW_SATISFIED ? (
-                          <div className="w-full bg-green-500/10 border border-green-500 rounded-lg p-3 flex items-center justify-center space-x-2">
-                            <CheckCircle className="w-5 h-5 text-green-500" />
-                            <span className="text-green-500 font-semibold">Work Approved - Ready to Distribute</span>
+                          <div className="w-full bg-green-500/10 border border-green-500/30 rounded-xl p-3 flex items-center justify-center space-x-2">
+                            <CheckCircle className="w-5 h-5 text-green-400" />
+                            <span className="text-green-400 font-semibold">Work Approved - Ready to Distribute</span>
                           </div>
                         ) : null}
                       </div>
@@ -450,8 +500,8 @@ export default function ReviewSubmission() {
             onClick={() => !reviewing && setIsReviewModalOpen(false)}
           />
           <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-            <div className="bg-[#0f0f0f] border border-gray-800 rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between p-6 border-b border-gray-800">
+            <div className="bg-[#1A031F] border border-[#2B0A2F] rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between p-6 border-b border-white/10">
                 <h2 className="text-2xl font-bold text-white">
                   {reviewType === 'approve' ? 'Approve Work' : 'Reject Work'}
                 </h2>
@@ -466,20 +516,20 @@ export default function ReviewSubmission() {
 
               <div className="p-6 space-y-6">
                 {reviewType === 'approve' ? (
-                  <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
+                  <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
                     <div className="flex items-start space-x-3">
                       <CheckCircle className="w-6 h-6 text-green-500 flex-shrink-0 mt-0.5" />
                       <div>
                         <h4 className="text-green-400 font-semibold text-sm mb-2">Confirm Approval</h4>
                         <p className="text-green-300 text-sm leading-relaxed">
                           By approving this work, you confirm that you are satisfied with the results. 
-                          After approval, you'll need to click "Distribute Rewards" to send the payment to talents.
+                          After approval, you'll need to click "Distribute Rewards" to send the payment.
                         </p>
                       </div>
                     </div>
                   </div>
                 ) : (
-                  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+                  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
                     <div className="flex items-start space-x-3">
                       <AlertTriangle className="w-6 h-6 text-yellow-500 flex-shrink-0 mt-0.5" />
                       <div>
@@ -493,7 +543,7 @@ export default function ReviewSubmission() {
                   </div>
                 )}
 
-                <div className="bg-[#1a1a1a] border border-gray-700 rounded-lg p-4">
+                <div className="bg-[#2B0A2F]/50 border border-[#641374]/30 rounded-xl p-4">
                   <h5 className="text-sm font-semibold text-white mb-3">Submission Details</h5>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
@@ -508,7 +558,7 @@ export default function ReviewSubmission() {
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-gray-400">Amount</span>
-                      <span className="text-lg font-bold text-[#622578]">{selectedGig.amount} SUI</span>
+                      <span className="text-lg font-bold text-purple-400">{selectedGig.amount} SUI</span>
                     </div>
                   </div>
                 </div>
@@ -522,8 +572,8 @@ export default function ReviewSubmission() {
                       value={rejectionReason}
                       onChange={(e) => setRejectionReason(e.target.value)}
                       rows={4}
-                      placeholder="Please provide a detailed reason for rejecting this work..."
-                      className="w-full bg-[#1a1a1a] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#622578] transition-colors resize-none"
+                      placeholder="Please provide a detailed reason..."
+                      className="w-full bg-[#2B0A2F]/50 border border-[#641374]/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-500 transition-colors resize-none"
                       disabled={reviewing}
                     />
                     <p className="text-xs text-gray-500 mt-1">
@@ -532,11 +582,11 @@ export default function ReviewSubmission() {
                   </div>
                 )}
 
-                <div className="flex items-center space-x-3 pt-4 border-t border-gray-800">
+                <div className="flex items-center space-x-3 pt-4 border-t border-white/10">
                   <button
                     onClick={() => setIsReviewModalOpen(false)}
                     disabled={reviewing}
-                    className="flex-1 px-6 py-3 text-gray-400 hover:text-white border border-gray-700 rounded-lg transition-colors disabled:opacity-50"
+                    className="flex-1 px-6 py-3 text-gray-400 hover:text-white border border-[#641374]/50 rounded-xl transition-colors disabled:opacity-50"
                   >
                     Cancel
                   </button>
@@ -545,9 +595,9 @@ export default function ReviewSubmission() {
                     disabled={reviewing || (reviewType === 'reject' && !rejectionReason.trim())}
                     className={`flex-1 ${
                       reviewType === 'approve'
-                        ? 'bg-green-600 hover:bg-green-700'
-                        : 'bg-red-600 hover:bg-red-700'
-                    } text-white font-semibold px-6 py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2`}
+                        ? 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800'
+                        : 'bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800'
+                    } text-white font-semibold px-6 py-3 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg`}
                   >
                     {reviewing ? (
                       <>
