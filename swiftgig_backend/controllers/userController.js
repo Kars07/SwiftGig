@@ -2,14 +2,17 @@ import User from "../models/User.js";
 import { sendVerificationEmail } from "../utils/emailService.js";
 import bcrypt from "bcryptjs";
 
+// ===== Register Talent =====
 export const registerTalent = async (req, res) => {
   await handleRegister(req, res, "Talent");
 };
 
+// ===== Register Client =====
 export const registerClient = async (req, res) => {
   await handleRegister(req, res, "Client");
 };
 
+// ===== Handle Register (Shared Function) =====
 const handleRegister = async (req, res, role) => {
   try {
     const { firstName, lastName, email, password } = req.body;
@@ -25,78 +28,92 @@ const handleRegister = async (req, res, role) => {
       role,
     });
 
-        await sendVerificationEmail(user);
+    await sendVerificationEmail(user);
 
-        res.status(201).json({
-            message: "User registered!",
-            userId: user._id,
-            role: user.role,
-        });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
+    res.status(201).json({
+      message: "User registered!",
+      userId: user._id,
+      role: user.role,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
-//email verification
+// ===== Verify Email =====
 export const verifyEmail = async (req, res) => {
-    try {
-        const { email, otp } = req.body;
+  try {
+    const { email, otp } = req.body;
 
-        const user = await User.findOne({ email });
-        if (!user) return res.status(404).json({ message: "User not found" });
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-        if (user.isEmailVerified)
-            return res.status(400).json({ message: "Email already verified" });
+    if (user.isEmailVerified)
+      return res.status(400).json({ message: "Email already verified" });
 
-        if (!user.emailVerificationOtp || !user.otpExpiresIn)
-            return res.status(400).json({ message: "no verification code found" });
-        //check expiry
-        if (Date.now() > user.otpExpiresIn)
-            return res.status(400).json({message: "verification code expired"});
+    if (!user.emailVerificationOtp || !user.otpExpiresIn)
+      return res.status(400).json({ message: "No verification code found" });
 
-        //check match
-        if (user.emailVerificationOtp !== otp)
-            return res.status(400).json({ message: "Invalid verification code" });
+    // Check expiry
+    if (Date.now() > user.otpExpiresIn)
+      return res.status(400).json({ message: "Verification code expired" });
 
-        //verified 
-        user.isEmailVerified = true;
-        user.emailVerificationOtp = null;
-        user.otpExpiresIn = null;
-        await user.save();
+    // Check match
+    if (user.emailVerificationOtp !== otp)
+      return res.status(400).json({ message: "Invalid verification code" });
 
-        res.status(200).json({ message: "Email verified sucessfully" });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
+    // Verified
+    user.isEmailVerified = true;
+    user.emailVerificationOtp = null;
+    user.otpExpiresIn = null;
+    await user.save();
+
+    res.status(200).json({ message: "Email verified successfully" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
+// ===== Login =====
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ success: false, message: "Email and password are required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Email and password are required" });
     }
 
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     if (!user.isEmailVerified) {
-      return res.status(401).json({ success: false, message: "Please verify your email before logging in." });
+      return res.status(401).json({
+        success: false,
+        message: "Please verify your email before logging in.",
+      });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(400).json({ success: false, message: "Invalid credentials" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid credentials" });
     }
 
+    // ✅ Include firstName & lastName in login response
     return res.status(200).json({
       success: true,
       message: "Login successful",
       user: {
         id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
         email: user.email,
         role: user.role,
         isEmailVerified: user.isEmailVerified,

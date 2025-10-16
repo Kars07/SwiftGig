@@ -24,7 +24,7 @@ const Login: React.FC = () => {
   };
 
   const handleRegisterClick = () => {
-    navigate("/profilecreation");
+    navigate("/create-profile");
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -221,7 +221,7 @@ const Login: React.FC = () => {
               disabled={loading}
               whileHover={{ scale: loading ? 1 : 1.05 }}
               whileTap={{ scale: loading ? 1 : 0.97 }}
-              className="mt-8 w-full py-3 bg-gradient-to-r from-[#622578] to-[#7a2e94] hover:opacity-90 rounded-lg font-semibold text-white shadow-[0_0_15px_rgba(124,58,237,0.3)] transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="mt-8 w-full py-3 bg-gradient-to-r from-[#622578] to-[#7a2e94] hover:opacity-90 rounded-lg font-semibold text-white shadow-[0_0_15px_rgba(124,58,237,0.3)] transition disabled:opacity-50 cursor-pointer"
             >
               {loading ? 'Signing In...' : 'Sign In'}
             </motion.button>

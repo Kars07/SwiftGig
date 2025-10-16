@@ -18,7 +18,7 @@ const ClientAuth = () => {
   // Redirect if not authenticated or not a client
   useEffect(() => {
     if (!userId || userRole !== 'Client') {
-      navigate('/profilecreation');
+      navigate('/create-profile');
     }
   }, [userId, userRole, navigate]);
 

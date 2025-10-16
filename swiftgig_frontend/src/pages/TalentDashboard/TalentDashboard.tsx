@@ -15,10 +15,28 @@ import {
 export default function TalentDashboard() {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [userData, setUserData] = useState<any>(null);
+  const [isLoggingOut, setIsLoggingOut] = useState(false); // 👈 added for animation
   const navigate = useNavigate();
   const location = useLocation();
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  // ✅ Load user data from localStorage
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (!storedUser) {
+      navigate("/login");
+      return;
+    }
+    try {
+      setUserData(JSON.parse(storedUser));
+    } catch {
+      localStorage.removeItem("user");
+      navigate("/login");
+    }
+  }, [navigate]);
+
+  // ✅ Animated background
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -111,19 +129,40 @@ export default function TalentDashboard() {
     },
   ];
 
-  const isActive = (path : string) => location.pathname === path;
+  const isActive = (path: string) => location.pathname === path;
+
+  // ✅ Logout with Fade Animation
+  const handleLogout = () => {
+    setIsLoggingOut(true); // start fade animation
+
+    setTimeout(() => {
+      localStorage.removeItem("user");
+      localStorage.removeItem("token");
+      setIsUserMenuOpen(false);
+      navigate("/login");
+    }, 800); // fade duration
+  };
+
+  const userFullName = userData
+    ? `${userData.firstName || ""} ${userData.lastName || ""}`.trim()
+    : "User";
+  const userEmail = userData?.email || "No email";
 
   return (
-    <div className="flex flex-col md:flex-row h-screen bg-gradient-to-br from-[#2B0A2F] via-[#2B0A2F] to-[#0D0012] text-white relative overflow-hidden">
-      {/* Animated Background Canvas */}
+    <div
+      className={`flex flex-col md:flex-row h-screen bg-gradient-to-br from-[#2B0A2F] via-[#2B0A2F] to-[#0D0012] text-white relative overflow-hidden transition-all duration-700 ease-in-out ${
+        isLoggingOut ? "opacity-0 translate-y-5" : "opacity-100 translate-y-0"
+      }`}
+    >
+      {/* Animated Background */}
       <canvas
         ref={canvasRef}
         className="absolute top-0 left-0 w-full h-full pointer-events-none"
         style={{ zIndex: 0 }}
       />
 
-      {/* Mobile Header with Menu Button */}
-      <header className="md:hidden flex items-center justify-between p-4- bg-[#1A031F]/60 backdrop-blur-lg border-b border-[#2B0A2F] relative z-10">
+      {/* Mobile Header */}
+      <header className="md:hidden flex items-center justify-between p-4 bg-[#1A031F]/60 backdrop-blur-lg border-b border-[#2B0A2F] relative z-10">
         <h1 className="text-lg tracking-[0.1em] font-semibold">SWIFTGIG</h1>
         <button
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -147,7 +186,7 @@ export default function TalentDashboard() {
           isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         }`}
       >
-        {/* Close Button (Mobile Only) */}
+        {/* Close Button (Mobile) */}
         <button
           onClick={() => setIsSidebarOpen(false)}
           className="md:hidden absolute top-4 right-4 p-2 rounded-lg bg-[#2B0A2F]/50 hover:bg-[#2B0A2F] transition"
@@ -155,14 +194,13 @@ export default function TalentDashboard() {
           <X className="w-5 h-5" />
         </button>
 
-        {/* Logo */}
+        {/* Logo and Menu */}
         <div>
           <h1 className="text-xl tracking-[0.1em] text-center mb-6 font-semibold mt-8 md:mt-0">
             SWIFTGIG
           </h1>
           <img src="/Vector 6.svg" alt="divider" className="mb-6 mx-auto" />
 
-          {/* Navigation */}
           <ul className="space-y-2">
             {menuItems.map((item) => (
               <li key={item.id}>
@@ -185,7 +223,7 @@ export default function TalentDashboard() {
           </ul>
         </div>
 
-        {/* User Info */}
+        {/* ✅ User Info Section */}
         <div className="bg-[#2B0A2F]/40 p-4 rounded-xl mt-6">
           <p className="text-sm text-purple-200">Talent Account</p>
           <div
@@ -193,11 +231,11 @@ export default function TalentDashboard() {
             className="flex items-center gap-2 mt-3 cursor-pointer"
           >
             <div className="bg-[#4B1656] w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold">
-              U
+              {userFullName.charAt(0) || "U"}
             </div>
             <div>
-              <p className="text-sm font-semibold">User Name</p>
-              <p className="text-xs text-purple-300">Wallet: ****3950</p>
+              <p className="text-sm font-semibold">{userFullName}</p>
+              <p className="text-xs text-purple-300">{userEmail}</p>
             </div>
           </div>
         </div>
@@ -224,33 +262,31 @@ export default function TalentDashboard() {
             }`}
           >
             <item.icon className="w-5 h-5 mb-1" />
-            {item.label.split(" ")[0]} {/* shorter labels for mobile */}
+            {item.label.split(" ")[0]}
           </button>
         ))}
       </nav>
 
-      {/* User Dropdown Modal */}
+      {/* ✅ User Dropdown Modal */}
       {isUserMenuOpen && (
         <>
-          {/* Overlay */}
           <div
             className="fixed inset-0 bg-black/40 z-40"
             onClick={() => setIsUserMenuOpen(false)}
           ></div>
 
-          {/* Dropdown Box */}
           <div className="fixed bottom-16 left-4 md:bottom-8 md:left-8 w-[90%] md:w-72 bg-[#1A031F] rounded-xl shadow-2xl z-50 border border-[#2B0A2F]/70 p-4 text-white">
-            <p className="text-xs text-purple-300 mb-3 font-semibold">
-              ACCOUNT
-            </p>
+            <p className="text-xs text-purple-300 mb-3 font-semibold">ACCOUNT</p>
 
             <div className="flex items-center justify-between p-3 bg-[#2B0A2F]/50 rounded-lg hover:bg-[#2B0A2F]/70 transition">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-[#4B1656] flex items-center justify-center text-xs font-semibold">
-                  U
+                  {userFullName.charAt(0) || "U"}
                 </div>
                 <div>
-                  <p className="text-sm font-medium">User's Workspace</p>
+                  <p className="text-sm font-medium">
+                    {userData?.firstName || "User"}'s Workspace
+                  </p>
                   <p className="text-xs text-purple-300">FREE</p>
                 </div>
               </div>
@@ -266,10 +302,7 @@ export default function TalentDashboard() {
             </div>
 
             <button
-              onClick={() => {
-                console.log("Logging out...");
-                setIsUserMenuOpen(false);
-              }}
+              onClick={handleLogout}
               className="w-full mt-4 px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-500/10 rounded-lg transition flex items-center gap-2"
             >
               <LogOut className="w-4 h-4" />

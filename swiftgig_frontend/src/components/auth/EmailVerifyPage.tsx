@@ -46,7 +46,7 @@ const EmailVerifyPage = () => {
   // Redirect if no email found
   useEffect(() => {
     if (!email) {
-      navigate('/profilecreation');
+      navigate('/create-profile');
     }
   }, [email, navigate]);
 

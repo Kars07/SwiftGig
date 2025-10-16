@@ -18,7 +18,7 @@ const TalentAuth = () => {
   // Redirect if not authenticated or not a talent
   useEffect(() => {
     if (!userId || userRole !== 'Talent') {
-      navigate('/profilecreation');
+      navigate('/create-profile');
     }
   }, [userId, userRole, navigate]);
 
@@ -653,7 +653,7 @@ const TalentAuth = () => {
             <button
               onClick={handleNext}
               disabled={loading}
-              className="px-8 py-3 bg-[#622578] text-white rounded-md font-medium hover:bg-[#622578]/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-8 py-3 bg-[#622578] text-white rounded-md font-medium hover:bg-[#622578]/90 transition-all cursor-pointer"
             >
               {loading ? 'Submitting...' : currentStep === totalSteps ? 'Submit Profile' : 'Next'}
             </button>
