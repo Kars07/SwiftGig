@@ -1,8 +1,11 @@
 import express from "express";
 import upload from "../middleware/upload.js";
-import { clientProfileUpdate } from "../controllers/clientController.js";
+import { getClientProfile, clientProfileUpdate } from "../controllers/clientController.js";
 
 const router = express.Router();
+
+// Fetch a Client profile
+router.get("/clientprofile/:userId", getClientProfile);
 
 router.post(
   "/clientprofile",

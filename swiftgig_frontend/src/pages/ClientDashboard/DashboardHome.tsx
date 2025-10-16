@@ -10,7 +10,7 @@ export default function DashboardHome() {
       <div className="bg-gradient-to-r from-[#] to-[#7a2e94] p-8">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-white mb-2">Welcome, User</h1>
+            <h1 className="text-3xl font-bold text-white mb-2">Welcome, Client</h1>
             <p className="text-gray-200">Your personal gig management dashboard</p>
           </div>
           <div className="flex items-center space-x-4">
