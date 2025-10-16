@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, CheckCircle, Clock, AlertCircle, X, Loader, ExternalLink, XCircle, MessageSquare, RefreshCw } from 'lucide-react';
+import { Upload, CheckCircle, Clock, AlertCircle, X, Loader, ExternalLink, XCircle, MessageSquare } from 'lucide-react';
 import { useCurrentAccount, useSignAndExecuteTransaction, useSuiClient } from '@mysten/dapp-kit';
 import { Transaction } from '@mysten/sui/transactions';
 
 const PACKAGE_ID = '0x58bdb3c9bd2d41c26b85131798d421fff9a9de89ccd82b007ccac144c3114313';
+const REGISTRY_ID = '0xa67a472036dfeb14dd622ff9af24fdfec492a09879ea5637091d927159541474';
 
 interface Gig {
   id: string;
@@ -20,13 +21,17 @@ interface Gig {
   unsatisfactionReason?: string;
 }
 
-// Gig state constants
 const GIG_ACTIVE = 0;
 const GIG_SUBMITTED = 1;
 const GIG_REVIEW_SATISFIED = 2;
 const GIG_REVIEW_UNSATISFIED = 3;
 const GIG_DISPUTED = 4;
 const GIG_CLOSED = 5;
+
+// Credit score adjustments
+const CREDIT_INCREASE_SUBMISSION = 2;
+const CREDIT_INCREASE_ACCEPT_REJECTION = 3;
+const CREDIT_DECREASE_LATE_SUBMISSION = 1;
 
 export default function Submission() {
   const account = useCurrentAccount();
@@ -90,7 +95,6 @@ export default function Submission() {
               const deadline = parseInt(metadata?.deadline) || 0;
               const state = parseInt(fields.state) || 0;
 
-              // Get client satisfaction and unsatisfaction reason
               let clientSatisfaction: boolean | null = null;
               if (fields.client_satisfaction) {
                 if (fields.client_satisfaction.vec && fields.client_satisfaction.vec.length > 0) {
@@ -110,7 +114,6 @@ export default function Submission() {
                 }
               }
 
-              // Check if talent has submitted
               const submissions = fields.submissions || [];
               let hasSubmitted = false;
               let submissionLink = '';
@@ -130,7 +133,6 @@ export default function Submission() {
                 }
               }
 
-              // Get reward amount from GigCreated event
               const gigCreatedEvents = await suiClient.queryEvents({
                 query: {
                   MoveEventType: `${PACKAGE_ID}::swiftgig::GigCreated`,
@@ -194,6 +196,23 @@ export default function Submission() {
     setIsContestModalOpen(true);
   };
 
+  const updateCreditScore = async (
+    tx: Transaction,
+    userAddr: string,
+    isIncrease: boolean,
+    amount: number
+  ) => {
+    tx.moveCall({
+      target: `${PACKAGE_ID}::swiftgig::update_credibility_score`,
+      arguments: [
+        tx.object(REGISTRY_ID),
+        tx.pure.address(userAddr),
+        tx.pure.bool(isIncrease),
+        tx.pure.u8(amount),
+      ],
+    });
+  };
+
   const handleSubmitWork = async () => {
     if (!account || !selectedGig) return;
 
@@ -206,14 +225,29 @@ export default function Submission() {
     const tx = new Transaction();
 
     try {
+      // Submit work
       tx.moveCall({
         target: `${PACKAGE_ID}::swiftgig::submit_work`,
         arguments: [
           tx.object(selectedGig.id),
           tx.pure.string(submissionLink),
-          tx.object('0x6'), // Clock object
+          tx.object('0x6'),
         ],
       });
+
+      // Check if submission is on time or late
+      const deadlineMs = new Date(selectedGig.deadline).getTime();
+      const currentTime = Date.now();
+      const isLate = currentTime > deadlineMs;
+
+      // Update credit score based on timeliness
+      if (isLate) {
+        // Late submission - small penalty
+        await updateCreditScore(tx, account.address, false, CREDIT_DECREASE_LATE_SUBMISSION);
+      } else {
+        // On-time submission - reward
+        await updateCreditScore(tx, account.address, true, CREDIT_INCREASE_SUBMISSION);
+      }
 
       signAndExecute(
         { transaction: tx },
@@ -224,7 +258,10 @@ export default function Submission() {
             setSubmitting(false);
           },
           onSuccess: () => {
-            showNotif('Work submitted successfully! 🎉');
+            const creditMsg = isLate 
+              ? `⚠️ Late submission (-${CREDIT_DECREASE_LATE_SUBMISSION} credit)`
+              : `✨ On-time submission (+${CREDIT_INCREASE_SUBMISSION} credit)`;
+            showNotif(`Work submitted successfully! ${creditMsg} 🎉`);
             setIsModalOpen(false);
             setSubmitting(false);
             setSubmissionLink('');
@@ -254,12 +291,13 @@ export default function Submission() {
     const tx = new Transaction();
 
     try {
+      // Contest decision
       tx.moveCall({
         target: `${PACKAGE_ID}::swiftgig::contest_decision`,
         arguments: [
           tx.object(selectedGig.id),
           tx.pure.string(contestReason),
-          tx.object('0x6'), // Clock object
+          tx.object('0x6'),
         ],
       });
 
@@ -297,12 +335,16 @@ export default function Submission() {
     const tx = new Transaction();
 
     try {
+      // Refund client
       tx.moveCall({
         target: `${PACKAGE_ID}::swiftgig::refund_client`,
         arguments: [
           tx.object(gigId),
         ],
       });
+
+      // Update talent's credit score for professional behavior
+      await updateCreditScore(tx, account.address, true, CREDIT_INCREASE_ACCEPT_REJECTION);
 
       signAndExecute(
         { transaction: tx },
@@ -313,7 +355,7 @@ export default function Submission() {
             setProcessing(false);
           },
           onSuccess: () => {
-            showNotif('Client refunded successfully. Gig closed.');
+            showNotif(`Client refunded. You earned +${CREDIT_INCREASE_ACCEPT_REJECTION} credibility for professionalism! 🌟`);
             setProcessing(false);
 
             setTimeout(() => {
@@ -455,7 +497,6 @@ export default function Submission() {
                   )}
                 </div>
 
-                {/* Rejection Notice */}
                 {gig.state === GIG_REVIEW_UNSATISFIED && gig.unsatisfactionReason && (
                   <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 mb-4">
                     <div className="flex items-start space-x-3">
@@ -489,7 +530,6 @@ export default function Submission() {
                       </div>
                     </div>
 
-                    {/* Action buttons for rejected work */}
                     {gig.state === GIG_REVIEW_UNSATISFIED && (
                       <div className="flex items-center space-x-3">
                         <button
@@ -565,10 +605,14 @@ export default function Submission() {
                       <span className="text-white text-xs font-bold">i</span>
                     </div>
                     <div>
-                      <h4 className="text-blue-400 font-semibold text-sm mb-1">Submission Guidelines</h4>
+                      <h4 className="text-blue-400 font-semibold text-sm mb-1">Submission Guidelines & Rewards</h4>
                       <p className="text-blue-300 text-xs leading-relaxed">
                         Provide a link to your completed work (Google Drive, GitHub, Figma, etc.). 
                         Make sure the link is accessible to the client for review.
+                        <br /><br />
+                        <strong>✨ On-time submission:</strong> +{CREDIT_INCREASE_SUBMISSION} credibility points
+                        <br />
+                        <strong>⚠️ Late submission:</strong> -{CREDIT_DECREASE_LATE_SUBMISSION} credibility point
                       </p>
                     </div>
                   </div>
@@ -592,40 +636,22 @@ export default function Submission() {
                 </div>
 
                 <div className="bg-[#1a1a1a] border border-gray-700 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm text-gray-400">Payment Amount</span>
-                    <span className="text-xl font-bold text-[#622578]">{selectedGig.amount} SUI</span>
+                  <div className="flex items-center justify-end">
+                    <button
+                      onClick={handleSubmitWork}
+                      disabled={submitting}
+                      className="bg-[#622578] hover:bg-[#7a2e94] text-white font-semibold px-6 py-2 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      {submitting ? (
+                        <>
+                          <Loader className="w-4 h-4 animate-spin inline-block mr-2" />
+                          Submitting...
+                        </>
+                      ) : (
+                        'Submit Work'
+                      )}
+                    </button>
                   </div>
-                  <p className="text-xs text-gray-500">
-                    Will be released upon client approval
-                  </p>
-                </div>
-
-                <div className="flex items-center space-x-3 pt-4 border-t border-gray-800">
-                  <button
-                    onClick={() => setIsModalOpen(false)}
-                    disabled={submitting}
-                    className="flex-1 px-6 py-3 text-gray-400 hover:text-white border border-gray-700 rounded-lg transition-colors disabled:opacity-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleSubmitWork}
-                    disabled={submitting || !submissionLink.trim()}
-                    className="flex-1 bg-[#622578] hover:bg-[#7a2e94] text-white font-semibold px-6 py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    {submitting ? (
-                      <>
-                        <Loader className="w-4 h-4 animate-spin" />
-                        <span>Submitting...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="w-4 h-4" />
-                        <span>Submit Work</span>
-                      </>
-                    )}
-                  </button>
                 </div>
               </div>
             </div>
@@ -641,11 +667,11 @@ export default function Submission() {
             onClick={() => !contesting && setIsContestModalOpen(false)}
           />
           <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-            <div className="bg-[#0f0f0f] border border-gray-800 rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="bg-[#0f0f0f] border border-gray-800 rounded-xl w-full max-w-lg">
               <div className="flex items-center justify-between p-6 border-b border-gray-800">
                 <div>
-                  <h2 className="text-2xl font-bold text-white">Contest Rejection</h2>
-                  <p className="text-gray-400 text-sm mt-1">Create a dispute for community voting</p>
+                  <h2 className="text-2xl font-bold text-white">{selectedGig.name}</h2>
+                  <p className="text-gray-400 text-sm mt-1">Contest the client's decision</p>
                 </div>
                 <button
                   onClick={() => !contesting && setIsContestModalOpen(false)}
@@ -655,84 +681,37 @@ export default function Submission() {
                   <X className="w-6 h-6" />
                 </button>
               </div>
-
               <div className="p-6 space-y-6">
-                <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-4">
-                  <div className="flex items-start space-x-3">
-                    <MessageSquare className="w-5 h-5 text-orange-400 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <h4 className="text-orange-400 font-semibold text-sm mb-1">Community Dispute</h4>
-                      <p className="text-orange-300 text-xs leading-relaxed">
-                        By contesting this decision, a poll will be created where community members with high credibility (≥70) 
-                        can vote. The voting period lasts 7 days. If you win, you'll receive the payment.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-[#1a1a1a] border border-gray-700 rounded-lg p-4">
-                  <h5 className="text-sm font-semibold text-white mb-3">Gig Details</h5>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-400">Gig</span>
-                      <span className="text-sm text-white font-medium">{selectedGig.name}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-400">Amount</span>
-                      <span className="text-lg font-bold text-[#622578]">{selectedGig.amount} SUI</span>
-                    </div>
-                  </div>
-                </div>
-
-                {selectedGig.unsatisfactionReason && (
-                  <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
-                    <h5 className="text-sm font-semibold text-red-400 mb-2">Client's Rejection Reason</h5>
-                    <p className="text-red-300 text-xs leading-relaxed">{selectedGig.unsatisfactionReason}</p>
-                  </div>
-                )}
-
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Your Response / Contest Reason *
+                    Reason for Contesting *
                   </label>
                   <textarea
                     value={contestReason}
                     onChange={(e) => setContestReason(e.target.value)}
+                    placeholder="Explain why you are contesting the decision..."
+                    className="w-full bg-[#1a1a1a] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#622578] transition-colors"
+                    disabled={contesting}
                     rows={4}
-                    placeholder="Explain why you disagree with the client's decision..."
-                    className="w-full bg-[#1a1a1a] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#622578] transition-colors resize-none"
-                    disabled={contesting}
                   />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Be clear and professional. The community will review both sides.
-                  </p>
                 </div>
-
-                <div className="flex items-center space-x-3 pt-4 border-t border-gray-800">
-                  <button
-                    onClick={() => setIsContestModalOpen(false)}
-                    disabled={contesting}
-                    className="flex-1 px-6 py-3 text-gray-400 hover:text-white border border-gray-700 rounded-lg transition-colors disabled:opacity-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleContestDecision}
-                    disabled={contesting || !contestReason.trim()}
-                    className="flex-1 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white font-semibold px-6 py-3 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg"
-                  >
-                    {contesting ? (
-                      <>
-                        <Loader className="w-4 h-4 animate-spin" />
-                        <span>Creating Dispute...</span>
-                      </>
-                    ) : (
-                      <>
-                        <MessageSquare className="w-4 h-4" />
-                        <span>Create Dispute</span>
-                      </>
-                    )}
-                  </button>
+                <div className="bg-[#1a1a1a] border border-gray-700 rounded-lg p-4">
+                  <div className="flex items-center justify-end">
+                    <button
+                      onClick={handleContestDecision}
+                      disabled={contesting}
+                      className="bg-orange-600 hover:bg-orange-700 text-white font-semibold px-6 py-2 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      {contesting ? (
+                        <>
+                          <Loader className="w-4 h-4 animate-spin inline-block mr-2" />
+                          Submitting...
+                        </>
+                      ) : (
+                        'Submit Dispute'
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

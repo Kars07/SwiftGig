@@ -4,6 +4,7 @@ import { useCurrentAccount, useSignAndExecuteTransaction, useSuiClient } from '@
 import { Transaction } from '@mysten/sui/transactions';
 
 const PACKAGE_ID = '0x58bdb3c9bd2d41c26b85131798d421fff9a9de89ccd82b007ccac144c3114313';
+const REGISTRY_ID = '0xa67a472036dfeb14dd622ff9af24fdfec492a09879ea5637091d927159541474';
 
 interface Submission {
   talent: string;
@@ -56,13 +57,16 @@ export default function ReviewSubmission() {
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMsg, setNotificationMsg] = useState('');
 
-  // Gig state constants
   const GIG_ACTIVE = 0;
   const GIG_SUBMITTED = 1;
   const GIG_REVIEW_SATISFIED = 2;
   const GIG_REVIEW_UNSATISFIED = 3;
   const GIG_DISPUTED = 4;
   const GIG_CLOSED = 5;
+
+  // Credit score adjustments
+  const CREDIT_INCREASE_SUCCESSFUL_GIG = 5;
+  const CREDIT_DECREASE_REJECTION = 2;
 
   useEffect(() => {
     if (account?.address) {
@@ -179,6 +183,23 @@ export default function ReviewSubmission() {
     setIsReviewModalOpen(true);
   };
 
+  const updateCreditScore = async (
+    tx: Transaction,
+    userAddr: string,
+    isIncrease: boolean,
+    amount: number
+  ) => {
+    tx.moveCall({
+      target: `${PACKAGE_ID}::swiftgig::update_credibility_score`,
+      arguments: [
+        tx.object(REGISTRY_ID),
+        tx.pure.address(userAddr),
+        tx.pure.bool(isIncrease),
+        tx.pure.u8(amount),
+      ],
+    });
+  };
+
   const handleReviewSubmission = async () => {
     if (!account || !selectedGig || reviewType === null) return;
 
@@ -194,6 +215,7 @@ export default function ReviewSubmission() {
       const satisfied = reviewType === 'approve';
       const reason = reviewType === 'reject' ? rejectionReason : '';
 
+      // Review submission
       tx.moveCall({
         target: `${PACKAGE_ID}::swiftgig::review_submission`,
         arguments: [
@@ -202,6 +224,15 @@ export default function ReviewSubmission() {
           reason ? tx.pure.option('string', reason) : tx.pure.option('string', null),
         ],
       });
+
+      // Update credit scores based on review
+      if (satisfied) {
+        // Positive review - increase client's credibility
+        await updateCreditScore(tx, account.address, true, CREDIT_INCREASE_SUCCESSFUL_GIG);
+      } else {
+        // Rejection - decrease client's credibility slightly
+        await updateCreditScore(tx, account.address, false, CREDIT_DECREASE_REJECTION);
+      }
 
       signAndExecute(
         { transaction: tx },
@@ -233,19 +264,25 @@ export default function ReviewSubmission() {
     }
   };
 
-  const handleDistributeRewards = async (gigId: string) => {
+  const handleDistributeRewards = async (gigId: string, acceptedTalents: string[]) => {
     if (!account) return;
 
     setDistributingRewards(true);
     const tx = new Transaction();
 
     try {
+      // Distribute rewards
       tx.moveCall({
         target: `${PACKAGE_ID}::swiftgig::distribute_rewards`,
         arguments: [
           tx.object(gigId),
         ],
       });
+
+      // Update credit scores for all talents who completed the gig
+      for (const talentAddr of acceptedTalents) {
+        await updateCreditScore(tx, talentAddr, true, CREDIT_INCREASE_SUCCESSFUL_GIG);
+      }
 
       signAndExecute(
         { transaction: tx },
@@ -256,7 +293,7 @@ export default function ReviewSubmission() {
             setDistributingRewards(false);
           },
           onSuccess: () => {
-            showNotif('Rewards distributed successfully! 💰🎉');
+            showNotif('Rewards distributed & credit scores updated! 💰🎉');
             setDistributingRewards(false);
 
             setTimeout(() => {
@@ -287,7 +324,6 @@ export default function ReviewSubmission() {
   return (
     <div className="w-full min-h-screen bg-[#1A031F]">
       <div className="px-4 md:pl-10 py-6 text-white">
-        {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
           <div>
             <h1 className="text-purple-400 text-sm">Client Dashboard</h1>
@@ -295,7 +331,6 @@ export default function ReviewSubmission() {
           </div>
         </div>
 
-        {/* Stats Section */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
           <div className="bg-[#2B0A2F]/70 p-5 rounded-2xl border border-[#641374]/50 flex justify-between items-center">
             <div>
@@ -322,7 +357,6 @@ export default function ReviewSubmission() {
 
         <Notification message={notificationMsg} show={showNotification} />
 
-        {/* Content Section */}
         {loadingGigs ? (
           <div className="bg-[#2B0A2F]/50 rounded-2xl p-12 flex flex-col justify-center items-center">
             <Loader className="w-8 h-8 text-purple-400 mb-3 animate-spin" />
@@ -359,7 +393,7 @@ export default function ReviewSubmission() {
                     
                     {gig.state === GIG_REVIEW_SATISFIED && gig.clientSatisfaction === true && (
                       <button
-                        onClick={() => handleDistributeRewards(gig.id)}
+                        onClick={() => handleDistributeRewards(gig.id, gig.acceptedTalents)}
                         disabled={distributingRewards}
                         className="ml-4 flex items-center space-x-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-semibold px-5 py-2.5 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg whitespace-nowrap"
                       >
@@ -524,6 +558,8 @@ export default function ReviewSubmission() {
                         <p className="text-green-300 text-sm leading-relaxed">
                           By approving this work, you confirm that you are satisfied with the results. 
                           After approval, you'll need to click "Distribute Rewards" to send the payment.
+                          <br /><br />
+                          <strong>✨ Bonus:</strong> Your credibility score will increase by {CREDIT_INCREASE_SUCCESSFUL_GIG} points!
                         </p>
                       </div>
                     </div>
@@ -537,6 +573,8 @@ export default function ReviewSubmission() {
                         <p className="text-yellow-300 text-xs leading-relaxed">
                           The talent can contest your decision. If contested, a community poll 
                           will determine the outcome. If not contested, your payment will be refunded.
+                          <br /><br />
+                          <strong>⚠️ Note:</strong> Your credibility score will decrease by {CREDIT_DECREASE_REJECTION} points.
                         </p>
                       </div>
                     </div>
