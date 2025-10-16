@@ -1,4 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+
+const API_URL = 'http://localhost:1880/api';
 
 // Individual Code Input Component
 const CodeInput = ({ index, value, onChange, onKeyDown, inputRefs }: {
@@ -24,18 +27,28 @@ const CodeInput = ({ index, value, onChange, onKeyDown, inputRefs }: {
 };
 
 const EmailVerifyPage = () => {
+  const navigate = useNavigate();
   const [code, setCode] = useState<string[]>(['', '', '', '', '', '']);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
   const [resendLoading, setResendLoading] = useState<boolean>(false);
   const [canResend, setCanResend] = useState<boolean>(false);
-  const [countdown, setCountdown] = useState<number>(600); // 10 min
+  const [countdown, setCountdown] = useState<number>(300); // 5 minutes (300 seconds)
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   
-  // Mock email - in real app, get from location.state or props
-  const email = 'user@example.com';
+  // Get user data from localStorage
+  const userData = JSON.parse(localStorage.getItem('user') || '{}');
+  const email = userData.email || '';
+  const userRole = userData.role || '';
+
+  // Redirect if no email found
+  useEffect(() => {
+    if (!email) {
+      navigate('/profilecreation');
+    }
+  }, [email, navigate]);
 
   // Initialize refs
   useEffect(() => {
@@ -72,7 +85,7 @@ const EmailVerifyPage = () => {
 
     // Auto-submit when all 6 digits are entered
     if (newCode.join('').length === 6 && !newCode.includes('')) {
-      handleVerify();
+      handleVerify(newCode.join(''));
     }
   };
 
@@ -97,12 +110,12 @@ const EmailVerifyPage = () => {
 
     // Auto-submit if full code pasted
     if (newCode.join('').length === 6 && !newCode.includes('')) {
-      handleVerify();
+      handleVerify(newCode.join(''));
     }
   };
 
-  const handleVerify = async () => {
-    const verificationCode = code.join('');
+  const handleVerify = async (providedCode?: string) => {
+    const verificationCode = providedCode || code.join('');
     if (verificationCode.length !== 6) {
       setError('Please enter the complete 6-digit code.');
       return;
@@ -112,23 +125,44 @@ const EmailVerifyPage = () => {
     setError('');
     
     try {
-      // TODO: Add your API call here
-      // Example:
-      // const response = await fetch('/api/verify-email', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ email, code: verificationCode })
-      // });
+      const response = await fetch(`${API_URL}/verifyEmail`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          email: email,
+          otp: verificationCode 
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Verification failed');
+      }
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      setSuccess('Email verified successfully! 🎉');
       
-      setSuccess('Email verified successfully!');
+      // Update localStorage to mark email as verified
+      const updatedUserData = {
+        ...userData,
+        isEmailVerified: true
+      };
+      localStorage.setItem('user', JSON.stringify(updatedUserData));
+
+      // Redirect based on user role after 2 seconds
       setTimeout(() => {
-        window.location.href = '/login';
+        if (userRole === 'Talent') {
+          navigate('/talent-auth');
+        } else if (userRole === 'Client') {
+          navigate('/client-auth');
+        } else {
+          navigate('/login');
+        }
       }, 2000);
-    } catch (err) {
-      setError('Verification failed. Please try again.');
+    } catch (err: any) {
+      setError(err.message || 'Verification failed. Please try again.');
+      setCode(['', '', '', '', '', '']);
+      inputRefs.current[0]?.focus();
     } finally {
       setLoading(false);
     }
@@ -139,32 +173,41 @@ const EmailVerifyPage = () => {
     setError('');
     
     try {
-      // TODO: Add your API call here
-      // Example:
-      // const response = await fetch('/api/resend-code', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ email })
-      // });
+      // Call the appropriate register endpoint again to resend OTP
+      const endpoint = userRole === 'Talent' ? '/register-talent' : '/register-client';
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await fetch(`${API_URL}${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+          email: userData.email,
+          password: 'resend' // Backend should handle resending without password validation
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to resend code');
+      }
       
-      setSuccess('New verification code sent to your email!');
+      setSuccess('New verification code sent to your email! 📧');
       setCanResend(false);
-      setCountdown(600);
+      setCountdown(300); // Reset to 5 minutes
       setCode(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
       setTimeout(() => setSuccess(''), 3000);
-    } catch (err) {
-      setError('Failed to resend code.');
+    } catch (err: any) {
+      setError(err.message || 'Failed to resend code. Please try again.');
     } finally {
       setResendLoading(false);
     }
   };
 
   const handleBackToLogin = () => {
-    window.location.href = '/login';
+    navigate('/login');
   };
 
   return (
@@ -228,7 +271,7 @@ const EmailVerifyPage = () => {
 
               <button
                 type="button"
-                onClick={handleVerify}
+                onClick={() => handleVerify()}
                 disabled={loading || code.join('').length !== 6}
                 className={`w-full py-3 rounded-lg font-medium transition-all duration-200 ${
                   loading || code.join('').length !== 6

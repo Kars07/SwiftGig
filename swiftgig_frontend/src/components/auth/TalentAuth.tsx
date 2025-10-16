@@ -1,25 +1,42 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+
+const API_URL = 'http://localhost:1880/api';
 
 const TalentAuth = () => {
+  const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 3;
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  // Get user data from localStorage
+  const userData = JSON.parse(localStorage.getItem('user') || '{}');
+  const userId = userData.userId || '';
+  const userRole = userData.role || '';
+
+  // Redirect if not authenticated or not a talent
+  useEffect(() => {
+    if (!userId || userRole !== 'Talent') {
+      navigate('/profilecreation');
+    }
+  }, [userId, userRole, navigate]);
 
   // Form state
   const [formData, setFormData] = useState({
-    // Step 1: Personal details & Banking
+    // Step 1: Personal details
     dateOfBirth: '',
     country: 'Nigeria',
     streetAddress: '',
     city: '',
     stateProvince: '',
+    zipCode: '',
     phone: '',
     profilePhoto: null as File | null,
-    accountNumber: '',
-    accountName: '',
-    bankName: '',
     // Step 2: Skills
     skills: [] as string[],
     customSkill: '',
+    category: '',
     // Step 3: Identification
     idType: '',
     idDocument: null as File | null
@@ -27,9 +44,70 @@ const TalentAuth = () => {
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    setError('');
+  };
+
+  const validateStep1 = () => {
+    if (!formData.dateOfBirth) {
+      setError('Date of birth is required');
+      return false;
+    }
+    if (!formData.streetAddress) {
+      setError('Street address is required');
+      return false;
+    }
+    if (!formData.city) {
+      setError('City is required');
+      return false;
+    }
+    if (!formData.phone) {
+      setError('Phone number is required');
+      return false;
+    }
+    if (!formData.profilePhoto) {
+      setError('Profile photo is required');
+      return false;
+    }
+    return true;
+  };
+
+  const validateStep2 = () => {
+    if (formData.skills.length === 0) {
+      setError('Please add at least one skill');
+      return false;
+    }
+    return true;
+  };
+
+  const validateStep3 = () => {
+    if (!formData.idType) {
+      setError('Please select an ID type');
+      return false;
+    }
+    if (!formData.idDocument) {
+      setError('Please upload your ID document');
+      return false;
+    }
+    return true;
   };
 
   const handleNext = () => {
+    setError('');
+    
+    if (currentStep === 1 && !validateStep1()) {
+      return;
+    }
+    if (currentStep === 2 && !validateStep2()) {
+      return;
+    }
+    if (currentStep === 3) {
+      if (!validateStep3()) {
+        return;
+      }
+      handleSubmit();
+      return;
+    }
+    
     if (currentStep < totalSteps) {
       setCurrentStep(currentStep + 1);
     }
@@ -38,6 +116,7 @@ const TalentAuth = () => {
   const handleBack = () => {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
+      setError('');
     }
   };
 
@@ -59,21 +138,77 @@ const TalentAuth = () => {
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setFormData(prev => ({ ...prev, profilePhoto: e.target.files![0] }));
+      const file = e.target.files[0];
+      if (file.size > 5 * 1024 * 1024) {
+        setError('Profile photo must be less than 5MB');
+        return;
+      }
+      setFormData(prev => ({ ...prev, profilePhoto: file }));
+      setError('');
     }
   };
 
   const handleIdDocumentUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setFormData(prev => ({ ...prev, idDocument: e.target.files![0] }));
+      const file = e.target.files[0];
+      if (file.size > 5 * 1024 * 1024) {
+        setError('ID document must be less than 5MB');
+        return;
+      }
+      setFormData(prev => ({ ...prev, idDocument: file }));
+      setError('');
     }
   };
 
-  const handleAccountNumberChange = (value: string) => {
-    // Only allow numbers and max 10 digits
-    const numbersOnly = value.replace(/\D/g, '');
-    if (numbersOnly.length <= 10) {
-      handleInputChange('accountNumber', numbersOnly);
+  const handleSubmit = async () => {
+    setLoading(true);
+    setError('');
+
+    try {
+      // Create FormData for file uploads
+      const formDataToSend = new FormData();
+      formDataToSend.append('userId', userId);
+      formDataToSend.append('Dob', formData.dateOfBirth);
+      formDataToSend.append('country', formData.country);
+      formDataToSend.append('streetAddress', formData.streetAddress);
+      formDataToSend.append('city', formData.city);
+      formDataToSend.append('state', formData.stateProvince);
+      formDataToSend.append('zipCode', formData.zipCode);
+      formDataToSend.append('phoneNumber', formData.phone);
+      formDataToSend.append('skills', formData.skills.join(', '));
+      formDataToSend.append('category', formData.skills[0] || 'General'); // Use first skill as category
+      formDataToSend.append('idType', formData.idType);
+
+      if (formData.profilePhoto) {
+        formDataToSend.append('photo', formData.profilePhoto);
+      }
+      if (formData.idDocument) {
+        formDataToSend.append('idDocument', formData.idDocument);
+      }
+
+      const response = await fetch(`${API_URL}/talent/talentprofile`, {
+        method: 'POST',
+        body: formDataToSend,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Profile update failed');
+      }
+
+      // Update localStorage with token if provided
+      if (data.token) {
+        localStorage.setItem('token', data.token);
+      }
+
+      // Navigate to talent dashboard
+      navigate('/talent-dashboard');
+    } catch (err: any) {
+      console.error('Profile submission error:', err);
+      setError(err.message || 'Failed to submit profile. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -88,24 +223,6 @@ const TalentAuth = () => {
     'Video Editing',
     'Data Entry',
     'Virtual Assistant'
-  ];
-
-  const nigerianBanks = [
-    'Access Bank',
-    'GTBank',
-    'Zenith Bank',
-    'First Bank',
-    'UBA',
-    'Fidelity Bank',
-    'Union Bank',
-    'Stanbic IBTC',
-    'Sterling Bank',
-    'Wema Bank',
-    'Polaris Bank',
-    'Ecobank',
-    'FCMB',
-    'Keystone Bank',
-    'Unity Bank'
   ];
 
   return (
@@ -141,7 +258,14 @@ const TalentAuth = () => {
       <div className="px-8 py-8">
         <div className="max-w-4xl mx-auto">
           
-          {/* Step 1: Personal Details & Banking */}
+          {/* Error Message */}
+          {error && (
+            <div className="mb-6 p-4 bg-red-900/20 border border-red-400/30 rounded-lg">
+              <p className="text-red-400 text-sm text-center">{error}</p>
+            </div>
+          )}
+
+          {/* Step 1: Personal Details */}
           {currentStep === 1 && (
             <div>
               <h2 className="text-3xl font-semibold text-white mb-3">
@@ -179,6 +303,7 @@ const TalentAuth = () => {
                       className="hidden"
                     />
                   </label>
+                  <p className="text-gray-500 text-xs mt-2">Max 5MB</p>
                 </div>
 
                 {/* Form Fields */}
@@ -192,7 +317,9 @@ const TalentAuth = () => {
                       type="date"
                       value={formData.dateOfBirth}
                       onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
+                      max={new Date(new Date().setFullYear(new Date().getFullYear() - 16)).toISOString().split('T')[0]}
                       className="w-full md:w-1/2 px-4 py-3 bg-transparent border border-gray-600 rounded-lg text-white focus:outline-none focus:border-[#622578]"
+                      required
                     />
                     <p className="text-red-400 text-sm mt-1">
                       You must be at least 16 years old to join SwiftGig.
@@ -228,6 +355,7 @@ const TalentAuth = () => {
                         value={formData.streetAddress}
                         onChange={(e) => handleInputChange('streetAddress', e.target.value)}
                         className="w-full px-4 py-3 bg-transparent border border-gray-600 rounded-lg text-white focus:outline-none focus:border-[#622578]"
+                        required
                       />
                     </div>
                     <div>
@@ -240,11 +368,12 @@ const TalentAuth = () => {
                         value={formData.city}
                         onChange={(e) => handleInputChange('city', e.target.value)}
                         className="w-full px-4 py-3 bg-transparent border border-gray-600 rounded-lg text-white focus:outline-none focus:border-[#622578]"
+                        required
                       />
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-white font-medium mb-2">State/Province</label>
                       <input
@@ -252,6 +381,16 @@ const TalentAuth = () => {
                         placeholder="Enter state/province"
                         value={formData.stateProvince}
                         onChange={(e) => handleInputChange('stateProvince', e.target.value)}
+                        className="w-full px-4 py-3 bg-transparent border border-gray-600 rounded-lg text-white focus:outline-none focus:border-[#622578]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-white font-medium mb-2">Zip Code</label>
+                      <input
+                        type="text"
+                        placeholder="Enter zip code"
+                        value={formData.zipCode}
+                        onChange={(e) => handleInputChange('zipCode', e.target.value)}
                         className="w-full px-4 py-3 bg-transparent border border-gray-600 rounded-lg text-white focus:outline-none focus:border-[#622578]"
                       />
                     </div>
@@ -274,6 +413,7 @@ const TalentAuth = () => {
                         value={formData.phone}
                         onChange={(e) => handleInputChange('phone', e.target.value)}
                         className="flex-1 px-4 py-3 bg-transparent border border-gray-600 rounded-lg text-white focus:outline-none focus:border-[#622578]"
+                        required
                       />
                     </div>
                   </div>
@@ -325,7 +465,7 @@ const TalentAuth = () => {
                     Add
                   </button>
                 </div>
-                <p className="text-gray-500 text-sm mt-2">Max 15 skills</p>
+                <p className="text-gray-500 text-sm mt-2">Max 15 skills ({formData.skills.length}/15)</p>
 
                 {/* Selected Skills */}
                 {formData.skills.length > 0 && (
@@ -406,13 +546,14 @@ const TalentAuth = () => {
                     value={formData.idType}
                     onChange={(e) => handleInputChange('idType', e.target.value)}
                     className="w-full md:w-1/2 px-4 py-3 bg-[#1a1a1a] border border-gray-600 rounded-lg text-white focus:outline-none focus:border-[#622578]"
+                    required
                   >
                     <option value="">Choose identification type</option>
                     <option value="International Passport">International Passport</option>
-                    <option value="National ID Card (NIN)">National ID Card (NIN)</option>
-                    <option value="Driver's License">Driver's License</option>
-                    <option value="Voter's Card">Voter's Card</option>
-                    <option value="Student ID Card">Student ID Card</option>
+                    <option value="NIN">National ID Card (NIN)</option>
+                    <option value="Driver License">Driver's License</option>
+                    <option value="Voter Card">Voter's Card</option>
+                    <option value="Student Id">Student ID Card</option>
                   </select>
                 </div>
 
@@ -500,9 +641,9 @@ const TalentAuth = () => {
           <div className="flex justify-between items-center mt-12 pt-8 border-t border-gray-800">
             <button
               onClick={handleBack}
-              disabled={currentStep === 1}
+              disabled={currentStep === 1 || loading}
               className={`px-8 py-3 rounded-md font-medium transition-all ${
-                currentStep === 1
+                currentStep === 1 || loading
                   ? 'text-gray-600 cursor-not-allowed'
                   : 'text-white border-2 border-gray-600 hover:border-[#622578]'
               }`}
@@ -511,9 +652,10 @@ const TalentAuth = () => {
             </button>
             <button
               onClick={handleNext}
-              className="px-8 py-3 bg-[#622578] text-white rounded-md font-medium hover:bg-[#622578]/90 transition-all"
+              disabled={loading}
+              className="px-8 py-3 bg-[#622578] text-white rounded-md font-medium hover:bg-[#622578]/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {currentStep === totalSteps ? 'Review your profile' : 'Next'}
+              {loading ? 'Submitting...' : currentStep === totalSteps ? 'Submit Profile' : 'Next'}
             </button>
           </div>
         </div>

@@ -1,14 +1,18 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
 import { Transaction } from '@mysten/sui/transactions';
 
-const PACKAGE_ID = '0x58bdb3c9bd2d41c26b85131798d421fff9a9de89ccd82b007ccac144c3114313'; // Replace with your deployed package ID
+const PACKAGE_ID = '0x58bdb3c9bd2d41c26b85131798d421fff9a9de89ccd82b007ccac144c3114313';
 const REGISTRY_ID = '0xa67a472036dfeb14dd622ff9af24fdfec492a09879ea5637091d927159541474';
+const API_URL = 'http://localhost:1880/api';
 
 export default function CreateProfile() {
+  const navigate = useNavigate();
   const account = useCurrentAccount();
   const { mutate: signAndExecute } = useSignAndExecuteTransaction();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [profileType, setProfileType] = useState<'talent' | 'client' | null>(null);
   
   // Common form data
@@ -36,140 +40,213 @@ export default function CreateProfile() {
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
     }
+    setError('');
   };
 
-  const createTalentProfile = () => {
+  const createTalentProfile = async () => {
     if (!account) return;
     
     if (!formData.agreeToTerms) {
-      alert('Please agree to the Terms of Service');
+      setError('Please agree to the Terms of Service');
       return;
     }
 
     const fullName = `${formData.firstName} ${formData.lastName}`.trim();
-    if (!fullName || !formData.skill) {
-      alert('Please fill in all required fields');
+    if (!fullName || !formData.skill || !formData.email || !formData.password) {
+      setError('Please fill in all required fields');
+      return;
+    }
+
+    if (formData.password.length < 8) {
+      setError('Password must be at least 8 characters');
       return;
     }
     
     setLoading(true);
-    const tx = new Transaction();
-    
-    // Determine preferred mode enum
-    let preferredModeArg;
-    if (formData.preferredMode === 'remote') {
-      preferredModeArg = tx.moveCall({
-        target: `${PACKAGE_ID}::swiftgig::is_remote`,
-        arguments: [],
-      });
-    } else if (formData.preferredMode === 'physical') {
-      preferredModeArg = tx.moveCall({
-        target: `${PACKAGE_ID}::swiftgig::is_physical`,
-        arguments: [],
-      });
-    } else {
-      preferredModeArg = tx.moveCall({
-        target: `${PACKAGE_ID}::swiftgig::is_both`,
-        arguments: [],
-      });
-    }
-    
-    tx.moveCall({
-      target: `${PACKAGE_ID}::swiftgig::create_talent_profile`,
-      arguments: [
-        tx.object(REGISTRY_ID),
-        tx.pure.string(fullName),
-        tx.pure.string(formData.skill),
-        preferredModeArg,
-      ],
-    });
+    setError('');
 
-    signAndExecute(
-      {
-        transaction: tx,
-      },
-      {
-        onError: (err) => {
-          console.error('Error creating talent profile:', err);
-          setLoading(false);
-          alert('Failed to create talent profile');
+    try {
+      // Step 1: Register user in backend database
+      const response = await fetch(`${API_URL}/register-talent`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        onSuccess: (result) => {
-          console.log('Talent profile created successfully:', result);
-          setLoading(false);
-          alert('Talent profile created successfully!');
-          // Reset form
-          setFormData({
-            firstName: '',
-            lastName: '',
-            email: '',
-            password: '',
-            skill: '',
-            preferredMode: 'remote',
-            extraInfo: '',
-            sendEmails: true,
-            agreeToTerms: false
-          });
-        },
+        body: JSON.stringify({
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          email: formData.email,
+          password: formData.password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Registration failed');
       }
-    );
+
+      // Step 2: Store user data in localStorage
+      const userData = {
+        userId: data.userId,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        role: data.role,
+      };
+
+      localStorage.setItem('user', JSON.stringify(userData));
+
+      // Step 3: Create blockchain profile
+      const tx = new Transaction();
+      
+      // Determine preferred mode enum
+      let preferredModeArg;
+      if (formData.preferredMode === 'remote') {
+        preferredModeArg = tx.moveCall({
+          target: `${PACKAGE_ID}::swiftgig::is_remote`,
+          arguments: [],
+        });
+      } else if (formData.preferredMode === 'physical') {
+        preferredModeArg = tx.moveCall({
+          target: `${PACKAGE_ID}::swiftgig::is_physical`,
+          arguments: [],
+        });
+      } else {
+        preferredModeArg = tx.moveCall({
+          target: `${PACKAGE_ID}::swiftgig::is_both`,
+          arguments: [],
+        });
+      }
+      
+      tx.moveCall({
+        target: `${PACKAGE_ID}::swiftgig::create_talent_profile`,
+        arguments: [
+          tx.object(REGISTRY_ID),
+          tx.pure.string(fullName),
+          tx.pure.string(formData.skill),
+          preferredModeArg,
+        ],
+      });
+
+      signAndExecute(
+        {
+          transaction: tx,
+        },
+        {
+          onError: (err) => {
+            console.error('Error creating talent profile on blockchain:', err);
+            setLoading(false);
+            setError('Profile created in database but blockchain registration failed. You can complete this later.');
+            // Still navigate to verify page since backend registration succeeded
+            setTimeout(() => navigate('/verify'), 2000);
+          },
+          onSuccess: (result) => {
+            console.log('Talent profile created successfully on blockchain:', result);
+            setLoading(false);
+            // Navigate to verify page
+            navigate('/verify');
+          },
+        }
+      );
+    } catch (err: any) {
+      console.error('Registration error:', err);
+      setError(err.message || 'Something went wrong. Please try again.');
+      setLoading(false);
+    }
   };
 
-  const createClientProfile = () => {
+  const createClientProfile = async () => {
     if (!account) return;
     
     if (!formData.agreeToTerms) {
-      alert('Please agree to the Terms of Service');
+      setError('Please agree to the Terms of Service');
       return;
     }
 
     const fullName = `${formData.firstName} ${formData.lastName}`.trim();
-    if (!fullName) {
-      alert('Please fill in your name');
+    if (!fullName || !formData.email || !formData.password) {
+      setError('Please fill in all required fields');
+      return;
+    }
+
+    if (formData.password.length < 8) {
+      setError('Password must be at least 8 characters');
       return;
     }
     
     setLoading(true);
-    const tx = new Transaction();
-    
-    tx.moveCall({
-      target: `${PACKAGE_ID}::swiftgig::create_client_profile`,
-      arguments: [
-        tx.object(REGISTRY_ID),
-        tx.pure.string(fullName),
-        tx.pure.string(formData.extraInfo || ''),
-      ],
-    });
+    setError('');
 
-    signAndExecute(
-      {
-        transaction: tx,
-      },
-      {
-        onError: (err) => {
-          console.error('Error creating client profile:', err);
-          setLoading(false);
-          alert('Failed to create client profile');
+    try {
+      // Step 1: Register user in backend database
+      const response = await fetch(`${API_URL}/register-client`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        onSuccess: (result) => {
-          console.log('Client profile created successfully:', result);
-          setLoading(false);
-          alert('Client profile created successfully!');
-          // Reset form
-          setFormData({
-            firstName: '',
-            lastName: '',
-            email: '',
-            password: '',
-            skill: '',
-            preferredMode: 'remote',
-            extraInfo: '',
-            sendEmails: true,
-            agreeToTerms: false
-          });
-        },
+        body: JSON.stringify({
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          email: formData.email,
+          password: formData.password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Registration failed');
       }
-    );
+
+      // Step 2: Store user data in localStorage
+      const userData = {
+        userId: data.userId,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        role: data.role,
+      };
+
+      localStorage.setItem('user', JSON.stringify(userData));
+
+      // Step 3: Create blockchain profile
+      const tx = new Transaction();
+      
+      tx.moveCall({
+        target: `${PACKAGE_ID}::swiftgig::create_client_profile`,
+        arguments: [
+          tx.object(REGISTRY_ID),
+          tx.pure.string(fullName),
+          tx.pure.string(formData.extraInfo || ''),
+        ],
+      });
+
+      signAndExecute(
+        {
+          transaction: tx,
+        },
+        {
+          onError: (err) => {
+            console.error('Error creating client profile on blockchain:', err);
+            setLoading(false);
+            setError('Profile created in database but blockchain registration failed. You can complete this later.');
+            // Still navigate to verify page since backend registration succeeded
+            setTimeout(() => navigate('/verify'), 2000);
+          },
+          onSuccess: (result) => {
+            console.log('Client profile created successfully on blockchain:', result);
+            setLoading(false);
+            // Navigate to verify page
+            navigate('/verify');
+          },
+        }
+      );
+    } catch (err: any) {
+      console.error('Registration error:', err);
+      setError(err.message || 'Something went wrong. Please try again.');
+      setLoading(false);
+    }
   };
 
   const handleSubmit = () => {
@@ -181,11 +258,8 @@ export default function CreateProfile() {
   };
 
   const handleSwitchProfile = () => {
-    if (profileType === 'talent') {
-      window.location.href = '/create-profile?type=client';
-    } else {
-      window.location.href = '/create-profile?type=talent';
-    }
+    setProfileType(profileType === 'talent' ? 'client' : 'talent');
+    setError('');
   };
 
   // If no profile type selected yet, show selection screen
@@ -271,6 +345,14 @@ export default function CreateProfile() {
               <p>Please connect your wallet first</p>
             </div>
           )}
+
+          {/* Login Link */}
+          <p className="mt-6 text-gray-400">
+            Already have an account?{' '}
+            <button onClick={() => navigate('/login')} className="text-[#622578] font-medium hover:underline">
+              Log In
+            </button>
+          </p>
         </div>
       </div>
     );
@@ -301,6 +383,13 @@ export default function CreateProfile() {
           </h2>
 
           <div>
+            {/* Error Message */}
+            {error && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-red-600 text-sm text-center">{error}</p>
+              </div>
+            )}
+
             {/* Wallet Connection Button */}
             {!account ? (
               <div className="mb-6">
@@ -334,7 +423,7 @@ export default function CreateProfile() {
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-black mb-2">
-                  First name
+                  First name *
                 </label>
                 <input
                   type="text"
@@ -342,11 +431,12 @@ export default function CreateProfile() {
                   value={formData.firstName}
                   onChange={handleInputChange}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#622578] focus:ring-1 focus:ring-[#622578]"
+                  required
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-black mb-2">
-                  Last name
+                  Last name *
                 </label>
                 <input
                   type="text"
@@ -354,46 +444,15 @@ export default function CreateProfile() {
                   value={formData.lastName}
                   onChange={handleInputChange}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#622578] focus:ring-1 focus:ring-[#622578]"
+                  required
                 />
               </div>
-            </div>
-
-            {/* Skill */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-black mb-2">
-                Primary Skill
-              </label>
-              <input
-                type="text"
-                name="skill"
-                value={formData.skill}
-                onChange={handleInputChange}
-                placeholder="e.g., Web Development, Graphic Design"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#622578] focus:ring-1 focus:ring-[#622578]"
-              />
-            </div>
-
-            {/* Preferred Mode */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-black mb-2">
-                Preferred Work Mode
-              </label>
-              <select
-                name="preferredMode"
-                value={formData.preferredMode}
-                onChange={handleInputChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#622578] focus:ring-1 focus:ring-[#622578]"
-              >
-                <option value="remote">Remote</option>
-                <option value="physical">Physical</option>
-                <option value="both">Both</option>
-              </select>
             </div>
 
             {/* Email */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-black mb-2">
-                Email
+                Email *
               </label>
               <input
                 type="email"
@@ -401,13 +460,14 @@ export default function CreateProfile() {
                 value={formData.email}
                 onChange={handleInputChange}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#622578] focus:ring-1 focus:ring-[#622578]"
+                required
               />
             </div>
 
             {/* Password */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-black mb-2">
-                Password
+                Password *
               </label>
               <div className="relative">
                 <input
@@ -417,6 +477,7 @@ export default function CreateProfile() {
                   onChange={handleInputChange}
                   placeholder="Password (8 or more characters)"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#622578] focus:ring-1 focus:ring-[#622578]"
+                  required
                 />
                 <button
                   type="button"
@@ -435,6 +496,39 @@ export default function CreateProfile() {
                   )}
                 </button>
               </div>
+            </div>
+
+            {/* Skill */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-black mb-2">
+                Primary Skill *
+              </label>
+              <input
+                type="text"
+                name="skill"
+                value={formData.skill}
+                onChange={handleInputChange}
+                placeholder="e.g., Web Development, Graphic Design"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#622578] focus:ring-1 focus:ring-[#622578]"
+                required
+              />
+            </div>
+
+            {/* Preferred Mode */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-black mb-2">
+                Preferred Work Mode
+              </label>
+              <select
+                name="preferredMode"
+                value={formData.preferredMode}
+                onChange={handleInputChange}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#622578] focus:ring-1 focus:ring-[#622578]"
+              >
+                <option value="remote">Remote</option>
+                <option value="physical">Physical</option>
+                <option value="both">Both</option>
+              </select>
             </div>
 
             {/* Checkboxes */}
@@ -495,9 +589,9 @@ export default function CreateProfile() {
             {/* Login Link */}
             <p className="text-center mt-6 text-gray-600">
               Already have an account?{' '}
-              <a href="#" className="text-[#622578] font-medium hover:underline">
+              <button onClick={() => navigate('/login')} className="text-[#622578] font-medium hover:underline">
                 Log In
-              </a>
+              </button>
             </p>
           </div>
         </div>
@@ -529,6 +623,13 @@ export default function CreateProfile() {
         </h2>
 
         <div>
+          {/* Error Message */}
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-red-600 text-sm text-center">{error}</p>
+            </div>
+          )}
+
           {/* Wallet Connection Button */}
           {!account ? (
             <div className="mb-6">
@@ -562,7 +663,7 @@ export default function CreateProfile() {
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
               <label className="block text-sm font-medium text-black mb-2">
-                First name
+                First name *
               </label>
               <input
                 type="text"
@@ -570,11 +671,12 @@ export default function CreateProfile() {
                 value={formData.firstName}
                 onChange={handleInputChange}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#622578] focus:ring-1 focus:ring-[#622578]"
+                required
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-black mb-2">
-                Last name
+                Last name *
               </label>
               <input
                 type="text"
@@ -582,29 +684,15 @@ export default function CreateProfile() {
                 value={formData.lastName}
                 onChange={handleInputChange}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#622578] focus:ring-1 focus:ring-[#622578]"
+                required
               />
             </div>
-          </div>
-
-          {/* Extra Info */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-black mb-2">
-              Company/Additional Info (Optional)
-            </label>
-            <input
-              type="text"
-              name="extraInfo"
-              value={formData.extraInfo}
-              onChange={handleInputChange}
-              placeholder="Company name, industry, etc."
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#622578] focus:ring-1 focus:ring-[#622578]"
-            />
           </div>
 
           {/* Email */}
           <div className="mb-4">
             <label className="block text-sm font-medium text-black mb-2">
-              Email
+              Email *
             </label>
             <input
               type="email"
@@ -612,13 +700,14 @@ export default function CreateProfile() {
               value={formData.email}
               onChange={handleInputChange}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#622578] focus:ring-1 focus:ring-[#622578]"
+              required
             />
           </div>
 
           {/* Password */}
           <div className="mb-4">
             <label className="block text-sm font-medium text-black mb-2">
-              Password
+              Password *
             </label>
             <div className="relative">
               <input
@@ -628,6 +717,7 @@ export default function CreateProfile() {
                 onChange={handleInputChange}
                 placeholder="Password (8 or more characters)"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#622578] focus:ring-1 focus:ring-[#622578]"
+                required
               />
               <button
                 type="button"
@@ -646,6 +736,21 @@ export default function CreateProfile() {
                 )}
               </button>
             </div>
+          </div>
+
+          {/* Extra Info */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-black mb-2">
+              Company/Additional Info (Optional)
+            </label>
+            <input
+              type="text"
+              name="extraInfo"
+              value={formData.extraInfo}
+              onChange={handleInputChange}
+              placeholder="Company name, industry, etc."
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#622578] focus:ring-1 focus:ring-[#622578]"
+            />
           </div>
 
           {/* Checkboxes */}
@@ -706,9 +811,9 @@ export default function CreateProfile() {
           {/* Login Link */}
           <p className="text-center mt-6 text-gray-600">
             Already have an account?{' '}
-            <a href="#" className="text-[#622578] font-medium hover:underline">
+            <button onClick={() => navigate('/login')} className="text-[#622578] font-medium hover:underline">
               Log In
-            </a>
+            </button>
           </p>
         </div>
       </div>

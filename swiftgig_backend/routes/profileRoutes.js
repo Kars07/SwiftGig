@@ -1,4 +1,3 @@
-
 import express from "express";
 import upload from "../middleware/upload.js";
 import { updateProfile } from "../controllers/profileController.js";
