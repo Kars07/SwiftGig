@@ -10,13 +10,15 @@ import {
   Menu,
   X,
   Book,
+  Sparkles,
 } from "lucide-react";
 
 export default function TalentDashboard() {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [userData, setUserData] = useState<any>(null);
-  const [isLoggingOut, setIsLoggingOut] = useState(false); // 👈 added for animation
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -33,6 +35,13 @@ export default function TalentDashboard() {
     } catch {
       localStorage.removeItem("user");
       navigate("/login");
+    }
+
+    // ✅ Show Welcome Modal for First-Time Login
+    const hasVisited = localStorage.getItem("hasVisitedTalent");
+    if (!hasVisited) {
+      setTimeout(() => setShowWelcome(true), 800); // show after fade-in
+      localStorage.setItem("hasVisitedTalent", "true");
     }
   }, [navigate]);
 
@@ -133,14 +142,13 @@ export default function TalentDashboard() {
 
   // ✅ Logout with Fade Animation
   const handleLogout = () => {
-    setIsLoggingOut(true); // start fade animation
-
+    setIsLoggingOut(true);
     setTimeout(() => {
       localStorage.removeItem("user");
       localStorage.removeItem("token");
       setIsUserMenuOpen(false);
       navigate("/login");
-    }, 800); // fade duration
+    }, 800);
   };
 
   const userFullName = userData
@@ -186,7 +194,6 @@ export default function TalentDashboard() {
           isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         }`}
       >
-        {/* Close Button (Mobile) */}
         <button
           onClick={() => setIsSidebarOpen(false)}
           className="md:hidden absolute top-4 right-4 p-2 rounded-lg bg-[#2B0A2F]/50 hover:bg-[#2B0A2F] transition"
@@ -194,7 +201,6 @@ export default function TalentDashboard() {
           <X className="w-5 h-5" />
         </button>
 
-        {/* Logo and Menu */}
         <div>
           <h1 className="text-xl tracking-[0.1em] text-center mb-6 font-semibold mt-8 md:mt-0">
             SWIFTGIG
@@ -223,30 +229,31 @@ export default function TalentDashboard() {
           </ul>
         </div>
 
-        {/* ✅ User Info Section */}
         <div className="bg-[#2B0A2F]/40 p-4 rounded-xl mt-6">
           <p className="text-sm text-purple-200">Talent Account</p>
           <div
             onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-            className="flex items-center gap-2 mt-3 cursor-pointer"
+            className="flex items-center gap-3 mt-3 cursor-pointer overflow-hidden"
           >
-            <div className="bg-[#4B1656] w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold">
+            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[#4B1656] flex items-center justify-center text-white font-semibold text-sm leading-none">
               {userFullName.charAt(0) || "U"}
             </div>
-            <div>
-              <p className="text-sm font-semibold">{userFullName}</p>
-              <p className="text-xs text-purple-300">{userEmail}</p>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold truncate max-w-[150px] md:max-w-[180px]">
+                {userFullName}
+              </p>
+              <p className="text-xs text-purple-300 truncate max-w-[150px] md:max-w-[180px]">
+                {userEmail}
+              </p>
             </div>
           </div>
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="flex-1 overflow-auto p-4 md:p-6 pb-20 md:pb-6 rounded-2xl relative z-10">
         <Outlet />
       </main>
 
-      {/* Bottom Navigation (Mobile) */}
       <nav className="fixed bottom-0 left-0 right-0 md:hidden bg-[#1A031F]/80 border-t border-[#2B0A2F] backdrop-blur-lg flex justify-around items-center py-3 z-40">
         {menuItems.map((item) => (
           <button
@@ -310,6 +317,28 @@ export default function TalentDashboard() {
             </button>
           </div>
         </>
+      )}
+
+      {/* ✅ Welcome Modal */}
+      {showWelcome && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[999] animate-fadeIn">
+          <div className="bg-[#1A031F] border border-purple-800 rounded-2xl p-8 shadow-2xl text-center w-[90%] sm:w-[400px] relative">
+            <Sparkles className="w-8 h-8 text-purple-400 mx-auto mb-3" />
+            <h2 className="text-xl font-semibold text-white mb-2">
+              Welcome back, {userData?.firstName || "Talent"}!
+            </h2>
+            <p className="text-purple-200 text-sm mb-6">
+              We're thrilled to have you here 🎉. Explore gigs, manage your
+              submissions, and grow your portfolio on SwiftGig.
+            </p>
+            <button
+              onClick={() => setShowWelcome(false)}
+              className="px-5 py-2 rounded-lg bg-purple-700 hover:bg-purple-800 transition text-white font-medium"
+            >
+              Get Started
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

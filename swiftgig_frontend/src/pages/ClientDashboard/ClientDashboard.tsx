@@ -15,7 +15,6 @@ import {
   Sparkles,
 } from "lucide-react";
 
-// ✅ Type definitions
 interface UserData {
   firstName: string;
   lastName: string;
@@ -40,9 +39,10 @@ interface MenuItem {
 }
 
 export default function ClientDashboard() {
-  const [isGigsOpen, setIsGigsOpen] = useState<boolean>(false);
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState<boolean>(false);
-  const [fadeOut, setFadeOut] = useState<boolean>(false);
+  const [isGigsOpen, setIsGigsOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [fadeOut, setFadeOut] = useState(false);
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [user, setUser] = useState<UserData | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
@@ -56,6 +56,13 @@ export default function ClientDashboard() {
       } catch (error) {
         console.error("Invalid user data in localStorage:", error);
       }
+    }
+
+    // ✅ Check if it's user's first visit
+    const hasVisited = localStorage.getItem("hasVisitedClientDashboard");
+    if (!hasVisited) {
+      setShowWelcomeModal(true);
+      localStorage.setItem("hasVisitedClientDashboard", "true");
     }
   }, []);
 
@@ -115,9 +122,7 @@ export default function ClientDashboard() {
     },
   ];
 
-  const isActive = (path?: string): boolean => {
-    return !!path && location.pathname === path;
-  };
+  const isActive = (path?: string): boolean => !!path && location.pathname === path;
 
   const handleNavigation = (item: MenuItem): void => {
     if (item.hasDropdown) {
@@ -161,7 +166,7 @@ export default function ClientDashboard() {
         {/* Navigation */}
         <nav className="flex-1 py-4">
           <div className="space-y-3 px-3">
-            {menuItems.map((item: MenuItem) => (
+            {menuItems.map((item) => (
               <div key={item.id}>
                 <button
                   onClick={() => handleNavigation(item)}
@@ -186,10 +191,9 @@ export default function ClientDashboard() {
                   )}
                 </button>
 
-                {/* Dropdown */}
                 {item.hasDropdown && isGigsOpen && item.subItems && (
                   <div className="ml-4 mt-1 space-y-2">
-                    {item.subItems.map((subItem: SubMenuItem) => (
+                    {item.subItems.map((subItem) => (
                       <button
                         key={subItem.id}
                         onClick={() => navigate(subItem.path)}
@@ -241,18 +245,17 @@ export default function ClientDashboard() {
                 CLIENT ACCOUNT
               </p>
 
-              {/* ✅ Updated Layout */}
-              <div className="flex items-start justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                <div className="flex items-start space-x-3">
+              <div className="flex flex-wrap items-start justify-between gap-2 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                <div className="flex items-start space-x-3 min-w-0 flex-1">
                   <div className="w-8 h-8 rounded-full bg-[#622578] flex items-center justify-center text-white text-xs font-semibold">
                     {user?.firstName?.charAt(0)?.toUpperCase() || "U"}
                   </div>
-                  <div className="flex flex-col">
-                    <p className="text-gray-900 text-sm font-medium leading-tight">
+                  <div className="flex flex-col min-w-0">
+                    <p className="text-gray-900 text-sm font-medium leading-tight break-words">
                       {user ? `${user.firstName} ${user.lastName}` : "User"}
                     </p>
                     <p
-                      className="text-gray-500 truncate text-xs mt-1 max-w-[160px]"
+                      className="text-gray-500 text-xs truncate mt-1 max-w-[150px] sm:max-w-[200px]"
                       title={user?.email}
                     >
                       {user?.email}
@@ -265,14 +268,13 @@ export default function ClientDashboard() {
                     navigate("/client-dashboard/profile");
                     setIsUserMenuOpen(false);
                   }}
-                  className="px-3 py-1.5 text-xs font-medium text-[#622578] border border-[#622578] rounded-lg hover:bg-[#622578] hover:text-white transition-colors mt-[2px]"
+                  className="px-3 py-1.5 text-xs font-medium text-[#622578] border border-[#622578] rounded-lg hover:bg-[#622578] hover:text-white transition-colors whitespace-nowrap"
                 >
                   Profile
                 </button>
               </div>
             </div>
 
-            {/* Logout */}
             <div className="p-4 border-t border-gray-200">
               <button
                 onClick={handleLogout}
@@ -284,6 +286,29 @@ export default function ClientDashboard() {
             </div>
           </div>
         </>
+      )}
+
+      {/* ✅ Welcome Modal for First-Time Users */}
+      {showWelcomeModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 text-center p-8 animate-fadeIn">
+            <Sparkles className="mx-auto w-10 h-10 text-[#622578]" />
+            <h2 className="text-2xl font-semibold mt-3 text-gray-800">
+              Welcome to SwiftGig!
+            </h2>
+            <p className="text-gray-600 mt-2 text-sm leading-relaxed">
+              Hey {user?.firstName || "there"} 👋, we're excited to have you onboard!
+              You can start by creating gigs or reviewing your current ones in your dashboard.
+            </p>
+
+            <button
+              onClick={() => setShowWelcomeModal(false)}
+              className="mt-6 bg-[#622578] text-white px-6 py-2 rounded-lg hover:bg-[#4b1c5c] transition-colors"
+            >
+              Let’s Go 🚀
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -1,5 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { ConnectButton } from "@mysten/dapp-kit";
+import { BrowserRouter as Router, Routes, Route, Outlet } from 'react-router-dom';
 import Login from './components/auth/Login';
 import EmailVerifyPage from './components/auth/EmailVerifyPage';
 import TalentAuth from './components/auth/TalentAuth';
@@ -13,56 +12,40 @@ import TalentDashboardHome from './pages/TalentDashboard/TalentDashboardHome';
 import CreateGigs from './pages/ClientDashboard/CreateGigs';
 import YourGigs from './pages/ClientDashboard/YourGigs';
 import Disputes from './pages/ClientDashboard/Disputes';
-import Gigs from './pages/TalentDashboard/Gigs'
-import VotingPoll from './pages/TalentDashboard/VotingPoll'
-import DashboardProfile from './pages/TalentDashboard/DashboardProfile'
-import DashboardSettings from './pages/TalentDashboard/DashboardSettings'
+import Gigs from './pages/TalentDashboard/Gigs';
+import VotingPoll from './pages/TalentDashboard/VotingPoll';
+import DashboardProfile from './pages/TalentDashboard/DashboardProfile';
+import DashboardSettings from './pages/TalentDashboard/DashboardSettings';
 import ClientProfile from './pages/ClientDashboard/ClientProfile';
 import ClientSettings from './pages/ClientDashboard/ClientSettings';
 import Submission from './pages/TalentDashboard/Submission';
 import ReviewSubmission from './pages/ClientDashboard/ReviewSubmission';
+import LandingPage from './pages/LandingPage';
+import Navbar from './components/Navbar';
+import Footer from './components/Footer';
 
-
-function LandingPage() {
+// Main layout wrapper with Navbar + Footer (only for landing page)
+const MainLayout = () => {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-white relative">
-      {/* Top Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-black">SwiftGig</h1>
-          
-          <div style={{
-            padding: '4px',
-            background: 'rgba(98, 37, 120, 0.1)',
-            borderRadius: '10px',
-            border: '1px solid rgba(98, 37, 120, 0.2)'
-          }}>
-            <ConnectButton />
-          </div>
-        </div>
-      </nav>
-
-      {/* Main Content */}
-      <div className="text-center pt-20">
-        <h2 className="text-5xl font-bold text-black mb-4">SwiftGig</h2>
-        <p className="text-xl text-gray-600 mb-8">Your freelancing platform</p>
-        <a
-          href="/create-profile"
-          className="inline-block px-8 py-3 bg-[#622578] text-white rounded-full font-medium hover:bg-[#622578]/90 transition-all"
-        >
-          Get Started
-        </a>
-      </div>
-    </div>
+    <>
+      <Navbar />
+      <Outlet />
+      <Footer />
+    </>
   );
-}
+};
 
 export default function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={<Login/>} />
+        {/* ✅ Routes WITH Navbar + Footer (Landing Page Only) */}
+        <Route element={<MainLayout />}>
+          <Route path="/" element={<LandingPage />} />
+        </Route>
+
+        {/* ✅ Routes WITHOUT Navbar + Footer */}
+        <Route path="/login" element={<Login />} />
         <Route path="/initialize-registry" element={<InitializeRegistry />} />
         <Route path="/create-profile" element={<CreateProfile />} />
         <Route path="/verify" element={<EmailVerifyPage />} />
@@ -82,7 +65,6 @@ export default function App() {
 
         {/* Talent Dashboard Routes */}
         <Route path="/talent-dashboard/*" element={<TalentDashboard />}>
-          <Route index element={<TalentDashboardHome />} />
           <Route index element={<TalentDashboardHome />} />
           <Route path="gigs" element={<Gigs />} />
           <Route path="voting-poll" element={<VotingPoll />} />
