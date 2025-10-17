@@ -6,28 +6,13 @@ import { Transaction } from '@mysten/sui/transactions';
 const PACKAGE_ID = '0x58bdb3c9bd2d41c26b85131798d421fff9a9de89ccd82b007ccac144c3114313';
 const REGISTRY_ID = '0xa67a472036dfeb14dd622ff9af24fdfec492a09879ea5637091d927159541474';
 
-interface Gig {
-  id: string;
-  name: string;
-  description: string;
-  deadline: string;
-  talentsNeeded: number;
-  timeframe: string;
-  amount: string;
-  status: 'active' | 'completed';
-  applicants: number;
-  waitlist: string[];
-  acceptedTalents: string[];
-  creator: string;
-}
-
 export default function YourGigs() {
   const account = useCurrentAccount();
   const { mutate: signAndExecute } = useSignAndExecuteTransaction();
   const suiClient = useSuiClient();
 
   // States
-  const [gigs, setGigs] = useState<Gig[]>([]);
+  const [gigs, setGigs] = useState([]);
   const [loadingGigs, setLoadingGigs] = useState(false);
   const [selectingTalents, setSelectingTalents] = useState(false);
 
@@ -36,8 +21,8 @@ export default function YourGigs() {
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
   const [isSelectTalentsModalOpen, setIsSelectTalentsModalOpen] = useState(false);
   
-  const [selectedGig, setSelectedGig] = useState<Gig | null>(null);
-  const [selectedTalents, setSelectedTalents] = useState<Set<string>>(new Set());
+  const [selectedGig, setSelectedGig] = useState(null);
+  const [selectedTalents, setSelectedTalents] = useState(new Set());
   const [rejectReason, setRejectReason] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
@@ -60,10 +45,10 @@ export default function YourGigs() {
         limit: 100,
       });
 
-      const userGigs: Gig[] = [];
+      const userGigs = [];
 
       for (const event of gigCreatedEvents.data) {
-        const eventData = event.parsedJson as any;
+        const eventData = event.parsedJson;
 
         // Only include gigs created by current user
         if (eventData.creator === account.address) {
@@ -74,7 +59,7 @@ export default function YourGigs() {
             });
 
             if (gigObject.data?.content && 'fields' in gigObject.data.content) {
-              const fields = gigObject.data.content.fields as any;
+              const fields = gigObject.data.content.fields;
               const metadata = fields.metadata?.fields || fields.metadata;
 
               // Extract strings properly
@@ -119,23 +104,23 @@ export default function YourGigs() {
     }
   };
 
-  const calculateTimeframe = (ms: number): string => {
+  const calculateTimeframe = (ms) => {
     const days = Math.ceil(ms / (1000 * 60 * 60 * 24));
     return `${days} days`;
   };
 
-  const showNotif = (msg: string) => {
+  const showNotif = (msg) => {
     setSuccessMessage(msg);
     setTimeout(() => setSuccessMessage(''), 4000);
   };
 
-  const handleSelectTalentsClick = (gig: Gig) => {
+  const handleSelectTalentsClick = (gig) => {
     setSelectedGig(gig);
     setSelectedTalents(new Set(gig.acceptedTalents));
     setIsSelectTalentsModalOpen(true);
   };
 
-  const handleTalentToggle = (talentAddress: string) => {
+  const handleTalentToggle = (talentAddress) => {
     const newSelected = new Set(selectedTalents);
     if (newSelected.has(talentAddress)) {
       newSelected.delete(talentAddress);
@@ -193,12 +178,12 @@ export default function YourGigs() {
     }
   };
 
-  const handleApproveClick = (gig: Gig) => {
+  const handleApproveClick = (gig) => {
     setSelectedGig(gig);
     setIsApproveModalOpen(true);
   };
 
-  const handleRejectClick = (gig: Gig) => {
+  const handleRejectClick = (gig) => {
     setSelectedGig(gig);
     setIsRejectModalOpen(true);
   };
@@ -222,7 +207,7 @@ export default function YourGigs() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status) => {
     if (status === 'active') {
       return (
         <span className="flex items-center space-x-1 bg-blue-500/20 text-blue-400 text-xs font-semibold px-3 py-1 rounded-full">
@@ -241,9 +226,9 @@ export default function YourGigs() {
 
   if (!account) {
     return (
-      <div className="min-h-screen bg-[#1a1a1a] p-8 flex items-center justify-center">
+      <div className="min-h-screen bg-[#1A031F] p-8 flex items-center justify-center">
         <div className="text-center">
-          <Briefcase className="w-12 h-12 text-gray-600 mx-auto mb-4" />
+          <Briefcase className="w-12 h-12 text-purple-400 mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-white mb-2">Connect Wallet</h3>
           <p className="text-gray-400">Please connect your wallet to view your gigs</p>
         </div>
@@ -252,7 +237,7 @@ export default function YourGigs() {
   }
 
   return (
-    <div className="min-h-screen bg-[#1a1a1a] p-8">
+    <div className="min-h-screen bg-[#1A031F] p-8">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-white mb-2">Your Gigs</h1>
@@ -274,9 +259,9 @@ export default function YourGigs() {
             </div>
           </div>
         ) : gigs.length === 0 ? (
-          <div className="bg-[#0f0f0f] border border-gray-800 rounded-xl p-12 text-center">
-            <div className="w-20 h-20 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Briefcase className="w-10 h-10 text-gray-600" />
+          <div className="bg-[#2B0A2F]/70 border border-[#641374]/50 rounded-2xl p-12 text-center">
+            <div className="w-20 h-20 bg-purple-600/20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Briefcase className="w-10 h-10 text-purple-400" />
             </div>
             <h3 className="text-xl font-semibold text-white mb-2">No gigs created yet</h3>
             <p className="text-gray-400">Your gigs will appear here once you create them</p>
@@ -284,7 +269,7 @@ export default function YourGigs() {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {gigs.map((gig) => (
-              <div key={gig.id} className="bg-[#0f0f0f] border border-gray-800 rounded-xl p-6 hover:border-[#622578] transition-colors">
+              <div key={gig.id} className="bg-[#2B0A2F]/70 border border-[#641374]/50 rounded-2xl p-6 hover:border-purple-500 transition-colors">
                 <div className="flex items-start justify-between mb-4">
                   <div>
                     <h3 className="text-xl font-semibold text-white mb-2">{gig.name}</h3>
@@ -295,15 +280,15 @@ export default function YourGigs() {
                 <p className="text-gray-400 text-sm mb-4 line-clamp-2">{gig.description}</p>
 
                 <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div className="bg-[#1a1a1a] rounded-lg p-3">
+                  <div className="bg-[#1A031F]/50 rounded-lg p-3 border border-[#641374]/30">
                     <div className="flex items-center space-x-2 mb-1">
-                      <DollarSign className="w-4 h-4 text-[#622578]" />
+                      <DollarSign className="w-4 h-4 text-purple-400" />
                       <p className="text-xs text-gray-400">Amount</p>
                     </div>
-                    <p className="text-lg font-bold text-[#622578]">{gig.amount} SUI</p>
+                    <p className="text-lg font-bold text-purple-400">{gig.amount} SUI</p>
                   </div>
 
-                  <div className="bg-[#1a1a1a] rounded-lg p-3">
+                  <div className="bg-[#1A031F]/50 rounded-lg p-3 border border-[#641374]/30">
                     <div className="flex items-center space-x-2 mb-1">
                       <Calendar className="w-4 h-4 text-gray-400" />
                       <p className="text-xs text-gray-400">Deadline</p>
@@ -320,7 +305,7 @@ export default function YourGigs() {
                   <span>{gig.timeframe}</span>
                 </div>
 
-                <div className="mb-4 bg-[#1a1a1a] rounded-lg p-3 border border-gray-800">
+                <div className="mb-4 bg-[#1A031F]/50 rounded-lg p-3 border border-[#641374]/30">
                   <p className="text-xs text-gray-400 mb-1">Applications</p>
                   <p className="text-lg font-bold text-white">{gig.applicants} applicants</p>
                 </div>
@@ -328,7 +313,7 @@ export default function YourGigs() {
                 {gig.status === 'active' && (
                   <button
                     onClick={() => handleSelectTalentsClick(gig)}
-                    className="w-full flex items-center justify-center space-x-2 bg-[#622578] hover:bg-[#7a2e94] text-white font-semibold px-4 py-3 rounded-lg transition-colors"
+                    className="w-full flex items-center justify-center space-x-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold px-4 py-3 rounded-lg transition-colors"
                   >
                     <Users className="w-5 h-5" />
                     <span>Select Talents ({gig.acceptedTalents.length}/{gig.talentsNeeded})</span>
@@ -362,10 +347,10 @@ export default function YourGigs() {
       {/* Select Talents Modal */}
       {isSelectTalentsModalOpen && selectedGig && (
         <>
-          <div className="fixed inset-0 bg-black/50 z-40" onClick={() => !selectingTalents && setIsSelectTalentsModalOpen(false)} />
+          <div className="fixed inset-0 bg-black/60 z-40" onClick={() => !selectingTalents && setIsSelectTalentsModalOpen(false)} />
           <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-            <div className="bg-[#0f0f0f] border border-gray-800 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between p-6 border-b border-gray-800">
+            <div className="bg-[#2B0A2F] border border-[#641374]/50 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between p-6 border-b border-[#641374]/50">
                 <div>
                   <h2 className="text-2xl font-bold text-white">{selectedGig.name}</h2>
                   <p className="text-gray-400 text-sm mt-1">Select talents from {selectedGig.applicants} applicants</p>
@@ -388,7 +373,7 @@ export default function YourGigs() {
 
                 {selectedGig.waitlist.length === 0 ? (
                   <div className="text-center py-8">
-                    <Users className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                    <Users className="w-12 h-12 text-purple-400 mx-auto mb-3" />
                     <p className="text-gray-400">No applicants yet</p>
                   </div>
                 ) : (
@@ -403,10 +388,10 @@ export default function YourGigs() {
                           onClick={() => !isAlreadyAccepted && handleTalentToggle(talentAddress)}
                           className={`p-4 rounded-lg border-2 transition-all cursor-pointer ${
                             isSelected
-                              ? 'bg-[#622578]/20 border-[#622578]'
+                              ? 'bg-purple-600/20 border-purple-500'
                               : isAlreadyAccepted
                               ? 'bg-green-500/10 border-green-500 opacity-60 cursor-not-allowed'
-                              : 'bg-[#1a1a1a] border-gray-800 hover:border-[#622578]'
+                              : 'bg-[#1A031F]/50 border-[#641374]/30 hover:border-purple-500'
                           }`}
                         >
                           <div className="flex items-center justify-between">
@@ -416,7 +401,7 @@ export default function YourGigs() {
                                 checked={isSelected}
                                 onChange={() => {}}
                                 disabled={isAlreadyAccepted}
-                                className="w-5 h-5 rounded cursor-pointer accent-[#622578]"
+                                className="w-5 h-5 rounded cursor-pointer accent-purple-600"
                               />
                               <div>
                                 <p className="font-semibold text-white">
@@ -438,18 +423,18 @@ export default function YourGigs() {
                   </div>
                 )}
 
-                <div className="flex items-center space-x-3 pt-4 border-t border-gray-800">
+                <div className="flex items-center space-x-3 pt-4 border-t border-[#641374]/50">
                   <button
                     onClick={() => setIsSelectTalentsModalOpen(false)}
                     disabled={selectingTalents}
-                    className="flex-1 px-6 py-3 text-gray-400 hover:text-white border border-gray-700 rounded-lg transition-colors disabled:opacity-50"
+                    className="flex-1 px-6 py-3 text-gray-400 hover:text-white border border-[#641374]/50 rounded-lg transition-colors disabled:opacity-50"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={confirmSelectTalents}
                     disabled={selectingTalents || selectedTalents.size !== selectedGig.talentsNeeded}
-                    className="flex-1 bg-[#622578] hover:bg-[#7a2e94] text-white font-semibold px-6 py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-semibold px-6 py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     {selectingTalents ? (
                       <>
@@ -470,10 +455,10 @@ export default function YourGigs() {
       {/* Approve Modal */}
       {isApproveModalOpen && selectedGig && (
         <>
-          <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setIsApproveModalOpen(false)} />
+          <div className="fixed inset-0 bg-black/60 z-40" onClick={() => setIsApproveModalOpen(false)} />
           <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-            <div className="bg-[#0f0f0f] border border-gray-800 rounded-xl w-full max-w-md">
-              <div className="flex items-center justify-between p-6 border-b border-gray-800">
+            <div className="bg-[#2B0A2F] border border-[#641374]/50 rounded-2xl w-full max-w-md">
+              <div className="flex items-center justify-between p-6 border-b border-[#641374]/50">
                 <h2 className="text-xl font-bold text-white">Approve Work</h2>
                 <button onClick={() => setIsApproveModalOpen(false)} className="text-gray-400 hover:text-white transition-colors">
                   <X className="w-6 h-6" />
@@ -493,10 +478,10 @@ export default function YourGigs() {
                   </div>
                 </div>
 
-                <div className="bg-[#1a1a1a] border border-gray-700 rounded-lg p-4">
+                <div className="bg-[#1A031F]/50 border border-[#641374]/30 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-gray-400 text-sm">Payment Amount</span>
-                    <span className="text-2xl font-bold text-[#622578]">{selectedGig.amount} SUI</span>
+                    <span className="text-2xl font-bold text-purple-400">{selectedGig.amount} SUI</span>
                   </div>
                   <p className="text-xs text-gray-500">This amount will be released to the talents</p>
                 </div>
@@ -504,7 +489,7 @@ export default function YourGigs() {
                 <div className="flex items-center space-x-3">
                   <button
                     onClick={() => setIsApproveModalOpen(false)}
-                    className="flex-1 px-6 py-3 text-gray-400 hover:text-white border border-gray-700 rounded-lg transition-colors"
+                    className="flex-1 px-6 py-3 text-gray-400 hover:text-white border border-[#641374]/50 rounded-lg transition-colors"
                   >
                     Cancel
                   </button>
@@ -524,10 +509,10 @@ export default function YourGigs() {
       {/* Reject Modal */}
       {isRejectModalOpen && selectedGig && (
         <>
-          <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setIsRejectModalOpen(false)} />
+          <div className="fixed inset-0 bg-black/60 z-40" onClick={() => setIsRejectModalOpen(false)} />
           <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-            <div className="bg-[#0f0f0f] border border-gray-800 rounded-xl w-full max-w-md">
-              <div className="flex items-center justify-between p-6 border-b border-gray-800">
+            <div className="bg-[#2B0A2F] border border-[#641374]/50 rounded-2xl w-full max-w-md">
+              <div className="flex items-center justify-between p-6 border-b border-[#641374]/50">
                 <h2 className="text-xl font-bold text-white">Reject Work</h2>
                 <button onClick={() => setIsRejectModalOpen(false)} className="text-gray-400 hover:text-white transition-colors">
                   <X className="w-6 h-6" />
@@ -554,14 +539,14 @@ export default function YourGigs() {
                     onChange={(e) => setRejectReason(e.target.value)}
                     rows={4}
                     placeholder="Please provide a detailed reason..."
-                    className="w-full bg-[#1a1a1a] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#622578] transition-colors resize-none"
+                    className="w-full bg-[#1A031F]/50 border border-[#641374]/30 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500 transition-colors resize-none"
                   />
                 </div>
 
                 <div className="flex items-center space-x-3">
                   <button
                     onClick={() => setIsRejectModalOpen(false)}
-                    className="flex-1 px-6 py-3 text-gray-400 hover:text-white border border-gray-700 rounded-lg transition-colors"
+                    className="flex-1 px-6 py-3 text-gray-400 hover:text-white border border-[#641374]/50 rounded-lg transition-colors"
                   >
                     Cancel
                   </button>
