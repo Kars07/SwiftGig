@@ -103,11 +103,6 @@ const DashboardHome: React.FC = () => {
               <p className="text-xl font-semibold">₦0.00</p>
             </div>
           </div>
-
-          <button className="bg-purple-500 hover:bg-purple-600 transition-colors px-5 py-2.5 rounded-lg flex items-center justify-center space-x-2 font-semibold w-full sm:w-auto">
-            <ArrowDownCircle className="w-5 h-5 text-white" />
-            <span>Withdraw</span>
-          </button>
         </div>
 
         {/* Credit Score Card */}

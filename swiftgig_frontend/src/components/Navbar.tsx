@@ -3,7 +3,7 @@ import { ConnectButton } from '@mysten/dapp-kit';
 
 export default function Navbar() {
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 px-6 py-4 bg-gradient-to-b from-black/60 via-black/40 to-transparent backdrop-blur-md transition-all duration-300">
+    <nav className="fixed top-0 left-0 right-0 z-50 px-6 py-4  bg-gradient-to-b from-[#0b0013] via-[#1a0025]  to-transparent backdrop-blur-md transition-all duration-300">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         {/* Logo */}
         <div className="flex items-center space-x-2">

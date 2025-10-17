@@ -100,12 +100,6 @@ export default function DashboardHome() {
                   <p className="text-xl font-semibold">₦0.00</p>
                 </div>
               </div>
-
-              {/* Withdraw Button */}
-              <button className="bg-white text-[#7a2e94] px-5 py-2.5 rounded-lg flex items-center space-x-2 hover:bg-gray-100 transition-colors font-semibold">
-                <ArrowDownCircle className="w-5 h-5" />
-                <span>Withdraw</span>
-              </button>
             </div>
           </div>
 
