@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Briefcase, BarChart3, User, Wallet, Bell, Settings, LogOut, Briefcase as BriefcaseIcon, Loader } from 'lucide-react';
 import { useCurrentAccount, useSuiClient } from '@mysten/dapp-kit';
+import ChatSystem from '../../components/ChatSystem';
 
 const PACKAGE_ID = '0x58bdb3c9bd2d41c26b85131798d421fff9a9de89ccd82b007ccac144c3114313';
 const REGISTRY_ID = '0xa67a472036dfeb14dd622ff9af24fdfec492a09879ea5637091d927159541474';
@@ -306,7 +307,8 @@ export default function DashboardHome() {
                 <p className="text-sm text-gray-400">Your current credit standing</p>
               </div>
             </div>
-
+               
+          <ChatSystem />
             {/* Recent Activity */}
             <div className="mt-8 bg-[#2B0A2F]/70 border border-[#641374]/50 rounded-2xl p-6">
               <h3 className="text-xl font-semibold text-white mb-4">Recent Activity</h3>
@@ -342,6 +344,7 @@ export default function DashboardHome() {
                   <p className="text-gray-400">No recent activity</p>
                   <p className="text-sm text-gray-500 mt-2">Your gig activities will appear here</p>
                 </div>
+                
               )}
             </div>
           </>

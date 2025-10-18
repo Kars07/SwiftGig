@@ -9,6 +9,7 @@ import {
   Loader,
 } from "lucide-react";
 import { useCurrentAccount, useSuiClient } from '@mysten/dapp-kit';
+import ChatSystem from "../../components/ChatSystem";
 
 const PACKAGE_ID = '0x58bdb3c9bd2d41c26b85131798d421fff9a9de89ccd82b007ccac144c3114313';
 const REGISTRY_ID = '0xa67a472036dfeb14dd622ff9af24fdfec492a09879ea5637091d927159541474';
@@ -451,7 +452,9 @@ const DashboardHome: React.FC = () => {
                 <p className="text-sm text-gray-500 mt-2">
                   Your gig activities will appear here
                 </p>
+                <ChatSystem />
               </div>
+              
             )}
           </div>
         </>
