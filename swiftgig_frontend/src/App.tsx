@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Outlet } from 'react-router-dom';
+import ProtectedRoute from './components/ProtectedRoute';
 import Login from './components/auth/Login';
 import EmailVerifyPage from './components/auth/EmailVerifyPage';
 import TalentAuth from './components/auth/TalentAuth';
@@ -52,19 +53,33 @@ export default function App() {
         <Route path="/talent-auth" element={<TalentAuth />} />
         <Route path="/client-auth" element={<ClientAuth />} />
         
-        {/* Client Dashboard Routes */}
-        <Route path="/client-dashboard/*" element={<ClientDashboard />}>
+        {/* Protected Client Dashboard Routes */}
+        <Route
+          path="/client-dashboard/*"
+          element={
+            <ProtectedRoute allowedRole="Client">
+              <ClientDashboard />
+            </ProtectedRoute>
+          }
+        >
           <Route index element={<DashboardHome />} />
           <Route path="create-gigs" element={<CreateGigs />} />
-          <Route path="your-gigs" element={<YourGigs />} /> 
+          <Route path="your-gigs" element={<YourGigs />} />
           <Route path="disputes" element={<Disputes />} />
           <Route path="settings" element={<ClientSettings />} />
           <Route path="profile" element={<ClientProfile />} />
           <Route path="review-submissions" element={<ReviewSubmission />} />
         </Route>
 
-        {/* Talent Dashboard Routes */}
-        <Route path="/talent-dashboard/*" element={<TalentDashboard />}>
+         {/* Protected Talent Dashboard Routes */}
+        <Route
+          path="/talent-dashboard/*"
+          element={
+            <ProtectedRoute allowedRole="Talent">
+              <TalentDashboard />
+            </ProtectedRoute>
+          }
+        >
           <Route index element={<TalentDashboardHome />} />
           <Route path="gigs" element={<Gigs />} />
           <Route path="voting-poll" element={<VotingPoll />} />
