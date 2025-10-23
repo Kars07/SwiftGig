@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Briefcase, BarChart3, User, Wallet, Bell, Settings, LogOut, Briefcase as BriefcaseIcon, Loader } from 'lucide-react';
 import { useCurrentAccount, useSuiClient } from '@mysten/dapp-kit';
-import ChatSystem from '../../components/ChatSystem';
+import ChatSystem from '../../components/ClientChatSystem';
 
 const PACKAGE_ID = '0x58bdb3c9bd2d41c26b85131798d421fff9a9de89ccd82b007ccac144c3114313';
 const REGISTRY_ID = '0xa67a472036dfeb14dd622ff9af24fdfec492a09879ea5637091d927159541474';

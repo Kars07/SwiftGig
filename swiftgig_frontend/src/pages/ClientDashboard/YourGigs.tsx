@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Briefcase, Calendar, Users, Clock, DollarSign, CheckCircle, XCircle, AlertCircle, X, Loader } from 'lucide-react';
+import { MessageCircle, Briefcase, Calendar, Users, Clock, DollarSign, CheckCircle, XCircle, AlertCircle, X, Loader } from 'lucide-react';
 import { useCurrentAccount, useSignAndExecuteTransaction, useSuiClient } from '@mysten/dapp-kit';
+import { useNavigate } from 'react-router-dom';
 import { Transaction } from '@mysten/sui/transactions';
 
 const PACKAGE_ID = '0x58bdb3c9bd2d41c26b85131798d421fff9a9de89ccd82b007ccac144c3114313';
 const REGISTRY_ID = '0xa67a472036dfeb14dd622ff9af24fdfec492a09879ea5637091d927159541474';
+const API_URL = 'http://localhost:1880';
 
 export default function YourGigs() {
   const account = useCurrentAccount();
@@ -25,6 +27,7 @@ export default function YourGigs() {
   const [selectedTalents, setSelectedTalents] = useState(new Set());
   const [rejectReason, setRejectReason] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const navigate = useNavigate();
 
   // Fetch user's gigs on mount
   useEffect(() => {
@@ -130,6 +133,40 @@ export default function YourGigs() {
     setSelectedTalents(newSelected);
   };
 
+  const createChatRooms = async (gigId, gigName, talentAddresses) => {
+    const clientName = localStorage.getItem('userName') || 'Client User';
+    
+    for (const talentAddress of talentAddresses) {
+      try {
+        const response = await fetch(`${API_URL}/api/chat/create-room`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({
+            gigId: gigId,
+            gigName: gigName,
+            clientId: account.address,
+            clientName: clientName,
+            talentId: talentAddress,
+            talentName: `${talentAddress.slice(0, 6)}...${talentAddress.slice(-4)}`
+          })
+        });
+
+        const data = await response.json();
+        
+        if (data.success && data.roomId) {
+          console.log(`Chat room created for talent ${talentAddress}`);
+        } else {
+          console.warn(`Failed to create chat room for ${talentAddress}:`, data.message);
+        }
+      } catch (error) {
+        console.error(`Error creating chat room for ${talentAddress}:`, error);
+      }
+    }
+  };
+
   const confirmSelectTalents = async () => {
     if (!account || !selectedGig) return;
 
@@ -160,8 +197,22 @@ export default function YourGigs() {
             showNotif('Failed to select talents');
             setSelectingTalents(false);
           },
-          onSuccess: () => {
+          onSuccess: async () => {
             showNotif('Talents selected successfully! ✅');
+            
+            const newlySelectedTalents = talentAddressesArray.filter(
+              addr => !selectedGig.acceptedTalents.includes(addr)
+            );
+            
+            if (newlySelectedTalents.length > 0) {
+              await createChatRooms(
+                selectedGig.id,
+                selectedGig.name,
+                newlySelectedTalents
+              );
+              console.log(`Created ${newlySelectedTalents.length} chat room(s)`);
+            }
+
             setIsSelectTalentsModalOpen(false);
             setSelectingTalents(false);
 
@@ -207,6 +258,36 @@ export default function YourGigs() {
     }
   };
 
+  // openchatTalent function
+  const openChatWithTalent = async (gigId, talentAddress) => {
+    try {
+      const response = await fetch(`${API_URL}/api/chat/get-or-create-room`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({
+          gigId,
+          clientId: account.address,
+          talentId: talentAddress,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.roomId) {
+        navigate(`/client-dashboard/messages/chat/${data.roomId}`);
+      } else {
+        console.error("Failed to create chat room:", data.message);
+        showNotif("Failed to open chat room");
+      }
+    } catch (error) {
+      console.error("Error creating chat room:", error);
+      showNotif("Error opening chat. Please try again.");
+    }
+  };
+
   const getStatusBadge = (status) => {
     if (status === 'active') {
       return (
@@ -235,7 +316,6 @@ export default function YourGigs() {
       </div>
     );
   }
-
   return (
     <div className="min-h-screen bg-[#1A031F] p-8">
       <div className="max-w-7xl mx-auto">
@@ -279,6 +359,7 @@ export default function YourGigs() {
 
                 <p className="text-gray-400 text-sm mb-4 line-clamp-2">{gig.description}</p>
 
+
                 <div className="grid grid-cols-2 gap-4 mb-4">
                   <div className="bg-[#1A031F]/50 rounded-lg p-3 border border-[#641374]/30">
                     <div className="flex items-center space-x-2 mb-1">
@@ -309,6 +390,31 @@ export default function YourGigs() {
                   <p className="text-xs text-gray-400 mb-1">Applications</p>
                   <p className="text-lg font-bold text-white">{gig.applicants} applicants</p>
                 </div>
+
+                {/* SHOW THIS WHEN TALENT HAS BEEN SELECTED */}
+                {gig.acceptedTalents.length > 0 && (
+                  <div className="mt-4 mb-6 space-y-3">
+                    {gig.acceptedTalents.map((talentAddress) => (
+                      <div
+                        key={talentAddress}
+                        className="flex items-center justify-between bg-[#1A031F]/50 border border-[#641374]/40 p-3 rounded-lg"
+                      >
+                        <span className="text-gray-300 text-sm">
+                          {talentAddress.slice(0, 6)}...{talentAddress.slice(-4)}
+                        </span>
+
+                        {/* ✅ MESSAGE BUTTON ADDED HERE */}
+                        <button
+                          onClick={() => openChatWithTalent(gig.id, talentAddress)} //Make sure this function exists
+                          className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-xs cursor-pointer"
+                        >
+                          <MessageCircle className="w-4 h-4" />
+                          Message
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )} 
 
                 {gig.status === 'active' && (
                   <button
@@ -344,7 +450,7 @@ export default function YourGigs() {
         )}
       </div>
 
-      {/* Select Talents Modal */}
+      {/* Select Talents Modal - Rest of the modals remain the same */}
       {isSelectTalentsModalOpen && selectedGig && (
         <>
           <div className="fixed inset-0 bg-black/60 z-40" onClick={() => !selectingTalents && setIsSelectTalentsModalOpen(false)} />
@@ -451,7 +557,7 @@ export default function YourGigs() {
           </div>
         </>
       )}
-
+      
       {/* Approve Modal */}
       {isApproveModalOpen && selectedGig && (
         <>

@@ -24,8 +24,9 @@ import ReviewSubmission from './pages/ClientDashboard/ReviewSubmission';
 import LandingPage from './pages/LandingPage';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
+import Messages from './pages/TalentDashboard/Messages';
 
-// Main layout wrapper with Navbar + Footer (only for landing page)
+// ✅ Layout only for Landing Page
 const MainLayout = () => {
   return (
     <>
@@ -37,23 +38,28 @@ const MainLayout = () => {
 };
 
 export default function App() {
+  // ✅ Get logged-in user info (you can replace this logic with your auth context or backend)
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const currentUserId = user?._id || ""; // ✅ Safe fallback
+  const userRole = user?.role === "Client" ? "client" : "talent"; // ✅ Convert to lowercase for your Messages props
+
   return (
     <Router>
       <Routes>
-        {/* ✅ Routes WITH Navbar + Footer (Landing Page Only) */}
+        {/* ✅ Public Landing Page with Navbar + Footer */}
         <Route element={<MainLayout />}>
           <Route path="/" element={<LandingPage />} />
         </Route>
 
-        {/* ✅ Routes WITHOUT Navbar + Footer */}
+        {/* ✅ Public Auth Routes (No Navbar/Footer) */}
         <Route path="/login" element={<Login />} />
         <Route path="/initialize-registry" element={<InitializeRegistry />} />
         <Route path="/create-profile" element={<CreateProfile />} />
         <Route path="/verify" element={<EmailVerifyPage />} />
         <Route path="/talent-auth" element={<TalentAuth />} />
         <Route path="/client-auth" element={<ClientAuth />} />
-        
-        {/* Protected Client Dashboard Routes */}
+
+        {/* ✅ Protected Client Dashboard */}
         <Route
           path="/client-dashboard/*"
           element={
@@ -69,9 +75,21 @@ export default function App() {
           <Route path="settings" element={<ClientSettings />} />
           <Route path="profile" element={<ClientProfile />} />
           <Route path="review-submissions" element={<ReviewSubmission />} />
+          
+          {/* ✅ Messages main page */}
+          <Route
+            path="messages"
+            element={<Messages userRole={userRole} currentUserId={currentUserId} />}
+          />
+
+          {/* ✅ NEW - Open chat with a specific user */}
+          <Route
+            path="messages/chat/:roomId"
+            element={<Messages userRole={userRole} currentUserId={currentUserId} />}
+          />
         </Route>
 
-         {/* Protected Talent Dashboard Routes */}
+        {/* ✅ Protected Talent Dashboard */}
         <Route
           path="/talent-dashboard/*"
           element={
@@ -86,7 +104,21 @@ export default function App() {
           <Route path="settings" element={<DashboardSettings />} />
           <Route path="profile" element={<DashboardProfile />} />
           <Route path="submissions" element={<Submission />} />
+
+          {/* ✅ Messages main page */}
+          <Route
+            path="messages"
+            element={<Messages userRole={userRole} currentUserId={currentUserId} />}
+          />
+
+          {/* ✅ NEW - Open chat directly */}
+          <Route
+            path="messages/chat/:roomId"
+            element={<Messages userRole={userRole} currentUserId={currentUserId} />}
+          />
         </Route>
+
+
       </Routes>
     </Router>
   );

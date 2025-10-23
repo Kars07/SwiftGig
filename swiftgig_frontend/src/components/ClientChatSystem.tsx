@@ -248,7 +248,7 @@ const ChatSystem: React.FC = () => {
 
           {/* ✅ Floating Button to Full Messages Page */}
           <Link
-            to="/talent-dashboard/messages"
+            to="/client-dashboard/messages"
             className="absolute bottom-4 left-4 w-10 h-10 rounded-full bg-[#641374] hover:bg-[#4B1656] flex items-center justify-center shadow-lg transition"
           >
             <MessageSquare className="w-5 h-5 text-white" />
