@@ -5,13 +5,29 @@ import Message from "../models/Message.js";
 export const getChatRooms = async (req, res) => {
   try {
     const { userId } = req.params;
+    
+    // Basic validation
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID is required"
+      });
+    }
+
     const rooms = await ChatRoom.find({
       $or: [{ clientId: userId }, { talentId: userId }]
     }).sort({ lastMessageTime: -1 });
 
-    res.json({ success: true, rooms });
+    return res.json({
+      success: true,
+      rooms
+    });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("Error in getChatRooms:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error"
+    });
   }
 };
 
@@ -19,47 +35,76 @@ export const getChatRooms = async (req, res) => {
 export const getMessages = async (req, res) => {
   try {
     const { gigId } = req.params;
-    const messages = await Message.find({ gigId }).sort({ timestamp: 1 });
 
-    res.json({ success: true, messages });
+    // Basic validation
+    if (!gigId) {
+      return res.status(400).json({
+        success: false,
+        message: "Gig ID is required"
+      });
+    }
+
+    const messages = await Message.find({ gigId })
+      .sort({ timestamp: 1 });
+
+    return res.json({
+      success: true,
+      messages
+    });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("Error in getMessages:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error"
+    });
   }
 };
 
-// Get or create chat room
+// Get or create a chat room
 export const getOrCreateRoom = async (req, res) => {
   try {
     const { gigId, gigName, clientId, clientName, talentId, talentName } = req.body;
+    
+    // Add basic validation without JWT
+    if (!gigId || !clientId || !talentId) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields: gigId, clientId, and talentId are required"
+      });
+    }
 
-    // Check if room already exists
+    // Look for existing room
     let room = await ChatRoom.findOne({
       gigId,
       clientId,
       talentId
     });
 
-    // If room doesn't exist, create it
+    // Create new room if doesn't exist
     if (!room) {
       room = await ChatRoom.create({
         gigId,
-        gigName,
+        gigName: gigName || 'Untitled Gig',
         clientId,
-        clientName,
+        clientName: clientName || clientId.slice(0, 6) + '...' + clientId.slice(-4),
         talentId,
-        talentName,
-        lastMessage: "",
+        talentName: talentName || talentId.slice(0, 6) + '...' + talentId.slice(-4),
+        lastMessage: '',
         lastMessageTime: new Date(),
-        unreadCount: {
-          client: 0,
-          talent: 0
-        }
+        unreadCount: { client: 0, talent: 0 }
       });
     }
 
-    res.json({ success: true, roomId: room._id });
+    return res.json({
+      success: true,
+      roomId: room._id,
+      room
+    });
   } catch (error) {
     console.error("Error in getOrCreateRoom:", error);
-    res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({
+      success: false,
+      message: "Server error while creating chat room"
+    });
   }
 };

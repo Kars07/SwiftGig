@@ -1,6 +1,5 @@
 import express from "express";
 import { getChatRooms, getMessages, getOrCreateRoom } from "../controllers/chatController.js";
-import { authenticateToken } from "../middleware/auth.js";
 
 const router = express.Router();
 

@@ -142,7 +142,6 @@ export default function YourGigs() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
           },
           body: JSON.stringify({
             gigId: gigId,
@@ -265,7 +264,6 @@ export default function YourGigs() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
         body: JSON.stringify({
           gigId,
