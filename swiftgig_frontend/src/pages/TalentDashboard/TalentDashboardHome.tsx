@@ -452,10 +452,13 @@ const DashboardHome: React.FC = () => {
                 <p className="text-sm text-gray-500 mt-2">
                   Your gig activities will appear here
                 </p>
-                <ChatSystem />
-              </div>
-              
+              </div>  
             )}
+         
+            {/* ✅ ChatSystem always visible */}
+            <div className="mt-6">
+              <ChatSystem />
+            </div>
           </div>
         </>
       )}

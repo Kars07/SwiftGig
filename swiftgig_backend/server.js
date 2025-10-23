@@ -16,7 +16,13 @@ import profileRoutes from "./routes/profileRoutes.js";
 connectDB();
 
 const app = express();
-const server = http.createServer(app); //instead of app.listen()
+const server = http.createServer(app);
+
+// Standard Middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(cors());
+app.use(morgan("dev"));
 
 //Initialize Socket.io
 const io = new SocketIOServer(server, {
@@ -104,14 +110,8 @@ function generateMessageId() {
   return Date.now().toString() + Math.random().toString(36).substr(2, 9);
 }
 
-// Standard Middleware
+// API Routes - MOVED AFTER MIDDLEWARE
 app.use("/api/chat", chatRoutes);
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(cors());
-app.use(morgan("dev"));
-
-// API Routes
 app.use("/api", UserRoute);
 app.use("/api/talent", talentRoute);
 app.use("/api/client", clientRoute);

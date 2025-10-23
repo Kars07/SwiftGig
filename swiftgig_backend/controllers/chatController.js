@@ -27,28 +27,39 @@ export const getMessages = async (req, res) => {
   }
 };
 
-// Create chat room
-export const createChatRoom = async (req, res) => {
+// Get or create chat room
+export const getOrCreateRoom = async (req, res) => {
   try {
     const { gigId, gigName, clientId, clientName, talentId, talentName } = req.body;
 
-    const roomExists = await ChatRoom.findOne({ gigId });
-    if (roomExists) return res.json({ success: true, message: "Chat room already exists", roomExists });
-
-    const newRoom = await ChatRoom.create({
+    // Check if room already exists
+    let room = await ChatRoom.findOne({
       gigId,
-      gigName,
       clientId,
-      clientName,
-      talentId,
-      talentName,
-      lastMessage: "Chat started",
-      lastMessageTime: new Date(),
-      unreadCount: { client: 0, talent: 0 },
+      talentId
     });
 
-    res.json({ success: true, message: "Chat room created", chatRoom: newRoom });
+    // If room doesn't exist, create it
+    if (!room) {
+      room = await ChatRoom.create({
+        gigId,
+        gigName,
+        clientId,
+        clientName,
+        talentId,
+        talentName,
+        lastMessage: "",
+        lastMessageTime: new Date(),
+        unreadCount: {
+          client: 0,
+          talent: 0
+        }
+      });
+    }
+
+    res.json({ success: true, roomId: room._id });
   } catch (error) {
+    console.error("Error in getOrCreateRoom:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
