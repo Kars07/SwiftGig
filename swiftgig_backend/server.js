@@ -11,6 +11,8 @@ import chatRoutes from "./routes/chatRoutes.js";
 import talentRoute from "./routes/talentRoute.js";
 import clientRoute from "./routes/clientRoute.js";
 import profileRoutes from "./routes/profileRoutes.js";
+import Message from "./models/Message.js";
+import ChatRoom from "./models/ChatRoom.js";
 
 // Connect to MongoDB
 connectDB();
@@ -81,10 +83,11 @@ io.on("connection", (socket) => {
       return;
     }
     socket.join(`gig-${gigId}`);
+    console.log(`Socket ${socket.id} joined room gig-${gigId}`);
   });
 
-  // Send message - with enhanced validation
-  socket.on("message:send", (data) => {
+  // Send message - with enhanced validation and database save
+  socket.on("message:send", async (data) => {
     const { gigId, senderId, senderName, senderRole, receiverId, message, messageType } = data;
 
     // Validate required fields
@@ -99,41 +102,100 @@ io.on("connection", (socket) => {
       return;
     }
 
-    const messageData = {
-      _id: generateMessageId(),
-      gigId,
-      senderId,
-      senderName: senderName?.slice(0, 50) || 'Anonymous', // Sanitize and provide default
-      senderRole: senderRole || 'user',
-      receiverId,
-      message: message.trim(),
-      messageType: messageType || "text",
-      timestamp: new Date(),
-      read: false
-    };
-
-    // Send message to room
-    io.to(`gig-${gigId}`).emit("message:receive", messageData);
-
-    // Notify receiver if online
-    const receiver = activeUsers.get(receiverId);
-    if (receiver) {
-      io.to(receiver.socketId).emit("notification:new", {
-        type: "message",
+    try {
+      // Save message to MongoDB
+      const newMessage = await Message.create({
         gigId,
-        senderName: messageData.senderName,
-        message: messageData.message.substring(0, 50) // Preview only
+        senderId,
+        senderName: senderName?.slice(0, 50) || 'Anonymous',
+        senderRole: senderRole || 'user',
+        receiverId,
+        message: message.trim(),
+        messageType: messageType || "text",
+        timestamp: new Date(),
+        read: false
       });
+
+      // Update chat room's last message
+      await ChatRoom.findOneAndUpdate(
+        { 
+          gigId,
+          $or: [
+            { clientId: senderId, talentId: receiverId },
+            { clientId: receiverId, talentId: senderId }
+          ]
+        },
+        {
+          lastMessage: message.trim().substring(0, 100),
+          lastMessageTime: new Date(),
+          $inc: { 
+            [`unreadCount.${senderRole === 'client' ? 'talent' : 'client'}`]: 1 
+          }
+        },
+        { upsert: false }
+      );
+
+      const messageData = {
+        _id: newMessage._id.toString(), // Use MongoDB _id
+        gigId: newMessage.gigId,
+        senderId: newMessage.senderId,
+        senderName: newMessage.senderName,
+        senderRole: newMessage.senderRole,
+        receiverId: newMessage.receiverId,
+        message: newMessage.message,
+        messageType: newMessage.messageType,
+        timestamp: newMessage.timestamp,
+        read: newMessage.read
+      };
+
+      // Send message to room
+      io.to(`gig-${gigId}`).emit("message:receive", messageData);
+
+      // Notify receiver if online
+      const receiver = activeUsers.get(receiverId);
+      if (receiver) {
+        io.to(receiver.socketId).emit("notification:new", {
+          type: "message",
+          gigId,
+          senderName: messageData.senderName,
+          message: messageData.message.substring(0, 50) // Preview only
+        });
+      }
+
+      console.log(`Message saved and sent in gig-${gigId}`);
+    } catch (error) {
+      console.error("Error saving message:", error);
+      socket.emit("error", { message: "Failed to save message" });
     }
   });
 
   // Mark messages as read - with validation
-  socket.on("message:read", ({ gigId, userId }) => {
+  socket.on("message:read", async ({ gigId, userId }) => {
     if (!gigId || !userId) {
       socket.emit("error", { message: "Invalid read receipt data" });
       return;
     }
-    io.to(`gig-${gigId}`).emit("messages:marked-read", { gigId, userId });
+
+    try {
+      // Update messages in database
+      await Message.updateMany(
+        { gigId, receiverId: userId, read: false },
+        { $set: { read: true } }
+      );
+
+      // Reset unread count in chat room
+      const userRole = activeUsers.get(userId)?.role;
+      if (userRole) {
+        await ChatRoom.findOneAndUpdate(
+          { gigId },
+          { $set: { [`unreadCount.${userRole}`]: 0 } }
+        );
+      }
+
+      io.to(`gig-${gigId}`).emit("messages:marked-read", { gigId, userId });
+    } catch (error) {
+      console.error("Error marking messages as read:", error);
+    }
   });
 
   // Typing indicators - with rate limiting
@@ -166,11 +228,6 @@ io.on("connection", (socket) => {
     }
   });
 });
-
-// Enhanced message ID generation
-function generateMessageId() {
-  return `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-}
 
 // API Routes - No JWT middleware
 app.use("/api/chat", chatRoutes);

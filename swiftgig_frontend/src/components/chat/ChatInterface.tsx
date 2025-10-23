@@ -47,47 +47,73 @@ export default function ChatInterface({
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [loading, setLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Initialize socket connection
   useEffect(() => {
-    const newSocket = io(SOCKET_URL);
+    if (!account?.address) return;
+
+    const newSocket = io(SOCKET_URL, {
+      transports: ['websocket', 'polling']
+    });
+    
     setSocket(newSocket);
 
-    // Join as user
-    newSocket.emit('user:join', {
-      userId: account?.address,
-      userName: 'Current User',
-      role: currentUserRole
-    });
+    newSocket.on('connect', () => {
+      console.log('Socket connected:', newSocket.id);
 
-    // Join chat room
-    newSocket.emit('chat:join', {
-      gigId,
-      userId: account?.address
+      // Join as user
+      newSocket.emit('user:join', {
+        userId: account.address,
+        userName: account.address.slice(0, 6) + '...' + account.address.slice(-4),
+        role: currentUserRole
+      });
+
+      // Join chat room
+      newSocket.emit('chat:join', {
+        gigId
+      });
+
+      console.log(`Joined room: gig-${gigId}`);
     });
 
     // Listen for new messages
     newSocket.on('message:receive', (message: Message) => {
+      console.log('New message received:', message);
       setMessages(prev => [...prev, message]);
-      scrollToBottom();
+      setTimeout(scrollToBottom, 100);
     });
 
     // Listen for typing indicator
-    newSocket.on('typing:show', ({ userName }) => {
-      setIsTyping(true);
+    newSocket.on('typing:show', ({ userName, userId }) => {
+      if (userId !== account.address) {
+        setIsTyping(true);
+      }
     });
 
-    newSocket.on('typing:hide', () => {
-      setIsTyping(false);
+    newSocket.on('typing:hide', ({ userId }) => {
+      if (userId !== account.address) {
+        setIsTyping(false);
+      }
+    });
+
+    // Handle connection errors
+    newSocket.on('connect_error', (error) => {
+      console.error('Socket connection error:', error);
+    });
+
+    newSocket.on('error', (error) => {
+      console.error('Socket error:', error);
     });
 
     // Cleanup
     return () => {
+      console.log('Disconnecting socket');
       newSocket.disconnect();
     };
-  }, [gigId, account?.address]);
+  }, [gigId, account?.address, currentUserRole]);
 
   // Fetch initial messages
   useEffect(() => {
@@ -95,31 +121,40 @@ export default function ChatInterface({
   }, [gigId]);
 
   const fetchMessages = async () => {
+    setLoading(true);
     try {
       const response = await fetch(`${SOCKET_URL}/api/chat/messages/${gigId}`);
       const data = await response.json();
+      
       if (data.success) {
-        setMessages(data.messages.reverse());
-        scrollToBottom();
+        console.log('Fetched messages:', data.messages.length);
+        setMessages(data.messages); // Already sorted by timestamp ascending
+        setTimeout(scrollToBottom, 100);
       }
     } catch (error) {
       console.error('Error fetching messages:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleSendMessage = () => {
-    if (!newMessage.trim() || !socket || isSending) return;
+    if (!newMessage.trim() || !socket || isSending || !account?.address) return;
 
     setIsSending(true);
-    socket.emit('message:send', {
+    
+    const messageData = {
       gigId,
-      senderId: account?.address,
-      senderName: 'Current User',
+      senderId: account.address,
+      senderName: account.address.slice(0, 6) + '...' + account.address.slice(-4),
       senderRole: currentUserRole,
       receiverId: otherUserId,
-      message: newMessage,
+      message: newMessage.trim(),
       messageType: 'text'
-    });
+    };
+
+    console.log('Sending message:', messageData);
+    socket.emit('message:send', messageData);
 
     setNewMessage('');
     setIsSending(false);
@@ -127,12 +162,12 @@ export default function ChatInterface({
   };
 
   const handleTyping = () => {
-    if (!socket) return;
+    if (!socket || !account?.address) return;
 
     socket.emit('typing:start', {
       gigId,
-      userId: account?.address,
-      userName: 'Current User'
+      userId: account.address,
+      userName: account.address.slice(0, 6) + '...' + account.address.slice(-4)
     });
 
     // Clear existing timeout
@@ -147,10 +182,10 @@ export default function ChatInterface({
   };
 
   const handleStopTyping = () => {
-    if (!socket) return;
+    if (!socket || !account?.address) return;
     socket.emit('typing:stop', {
       gigId,
-      userId: account?.address
+      userId: account.address
     });
   };
 
@@ -164,6 +199,14 @@ export default function ChatInterface({
       minute: '2-digit'
     });
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full bg-[#1a1a1a]">
+        <div className="text-purple-400">Loading messages...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-screen bg-[#1a1a1a]">
