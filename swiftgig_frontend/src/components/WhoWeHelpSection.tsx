@@ -1,4 +1,5 @@
 import React from 'react';
+import { GraduationCap, Users, Briefcase } from "lucide-react";
 
 export default function WhoWeHelpSection() {
   return (
@@ -31,7 +32,7 @@ export default function WhoWeHelpSection() {
           {/* Career Changers */}
           <div className="group bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 hover:bg-white/10 hover:border-[#622578] transition-all duration-500 ease-out hover:scale-[1.04]">
             <div className="w-16 h-16 bg-purple-400/20 rounded-full flex items-center justify-center mb-6 mx-auto">
-              <i className="fas fa-route text-3xl text-purple-400"></i>
+              <GraduationCap className="text-purple-400 w-8 h-8" />
             </div>
             <h3 className="text-2xl font-bold text-white mb-6 text-center">Graduates</h3>
             <ul className="space-y-4 text-gray-300 text-sm">
@@ -61,7 +62,7 @@ export default function WhoWeHelpSection() {
           {/* Students */}
           <div className="group bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 hover:bg-white/10 hover:border-[#622578] transition-all duration-500 ease-out hover:scale-[1.04]">
             <div className="w-16 h-16 bg-purple-400/20 rounded-full flex items-center justify-center mb-6 mx-auto">
-              <i className="fas fa-graduation-cap text-3xl text-purple-400"></i>
+              <Users className="text-purple-400 w-8 h-8" />
             </div>
             <h3 className="text-2xl font-bold text-white mb-6 text-center">Students</h3>
             <ul className="space-y-4 text-gray-300 text-sm">
@@ -91,7 +92,7 @@ export default function WhoWeHelpSection() {
           {/* Professionals */}
           <div className="group bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 hover:bg-white/10 hover:border-[#622578] transition-all duration-500 ease-out hover:scale-[1.04]">
             <div className="w-16 h-16 bg-purple-400/20 rounded-full flex items-center justify-center mb-6 mx-auto">
-              <i className="fas fa-user-tie text-3xl text-purple-400"></i>
+              <Briefcase className="text-purple-400 w-8 h-8" />
             </div>
             <h3 className="text-2xl font-bold text-white mb-6 text-center">Professionals</h3>
             <ul className="space-y-4 text-gray-300 text-sm">

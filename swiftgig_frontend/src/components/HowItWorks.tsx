@@ -15,15 +15,13 @@ const hiringCards: Card[] = [
   {
     id: "h1",
     title: "Posting Gigs for Hire",
-    image:
-      "https://images.unsplash.com/photo-1503602642458-232111445657?q=80&w=1400&auto=format&fit=crop&ixlib=rb-4.0.3&s=3d3b5a3f1c6f4b3b1f2a1f4a8f1b2c3d",
+    image:"/images/find_gigs.jpg",
     description: "Create a job post and attract qualified talent.",
   },
   {
     id: "h2",
     title: "Get engagment and hire",
-    image:
-      "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=1400&auto=format&fit=crop&ixlib=rb-4.0.3&s=1c9f0a1d2a3b4c5d6e7f8a9b0c1d2e3f",
+    image: "/images/lookfor_gigs.jpg",
     description: "Review proposals, interview and choose the best fit.",
   },
   {
@@ -39,15 +37,13 @@ const findingCards: Card[] = [
   {
     id: "f1",
     title: "Find relevant Gigs fast",
-    image:
-      "https://images.unsplash.com/photo-1520975911985-9d5ae5d3b1f1?q=80&w=1400&auto=format&fit=crop&ixlib=rb-4.0.3&s=0e7f8c9a1b2c3d4e5f6a7b8c9d0e1f2a",
+    image: "/images/find_gigs.jpg",
     description: "Browse curated opportunities matched to your skills.",
   },
   {
     id: "f2",
     title: "Send great proposals",
-    image:
-      "https://images.unsplash.com/photo-1531379410508-63b2c2a45d6d?q=80&w=1400&auto=format&fit=crop&ixlib=rb-4.0.3&s=2b1c3d4e5f6a7b8c9d0e1f2a3b4c5d6e",
+    image:"images/send_proposals.jpg",
     description: "Stand out with a tailored pitch and portfolio.",
   },
   {
